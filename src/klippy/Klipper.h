@@ -26,16 +26,16 @@ struct SubState {
     std::string homed_axes;
 };
 
-class KlipperCommand {
+class Klipper {
 public:
-    explicit KlipperCommand(Poller* poller) : mPoller(poller), sock(-1) {
+    explicit Klipper() {
     }
 
-    ~KlipperCommand(){
+    ~Klipper(){
         disconnect();
     };
 
-    int init(const char *socketPath);
+    int init(const char *socketPath, Poller *mPoller);
 
     void onPosChange(std::function<void(double, double, double)> callback) {
         posChangeCallback = callback;
@@ -66,9 +66,9 @@ private:
 private:
     std::mutex mutex;
     std::condition_variable condition;
-    int sock;
-    IOEvent* mIOEvent;
-    Poller* mPoller;
+    int sock = -1;
+    IOEvent* mIOEvent = nullptr;
+    Poller* mPoller = nullptr;
     std::function<void(double, double, double)> posChangeCallback; 
     char buffer[BUFFER_SIZE];
 };

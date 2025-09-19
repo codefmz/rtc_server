@@ -1,5 +1,9 @@
 #include "Base.h"
+#include <iostream>
+#include <cstring>
 #include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <array>
 #include <fstream>
 std::string Utils::getCameraDevName(const std::string &camName)
@@ -32,4 +36,16 @@ std::string Utils::getCameraDevName(const std::string &camName)
     }
 
     return "/dev/" + devNames[0];
+}
+
+void Utils::getVideoDevs(std::vector<std::string> &devs)
+{
+    FILE *fp = popen("ls /dev/video* 2>/dev/null", "r");
+    char buf[1024] = { 0 };
+    while (fgets(buf, 1024, fp)) {
+        buf[strlen(buf) - 1] = '\0';  
+        devs.push_back(std::string(buf));
+    }
+
+    pclose(fp);
 }

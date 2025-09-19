@@ -19,10 +19,6 @@ V4l2MediaSource::V4l2MediaSource(std::shared_ptr<ThreadPool> pool, const std::st
 
     ret = videoInit();
     assert(ret == true);
-
-    for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
-        mPool->addTask(mTask);
-    }
 }
 
 V4l2MediaSource::~V4l2MediaSource()
@@ -32,7 +28,9 @@ V4l2MediaSource::~V4l2MediaSource()
 
 void V4l2MediaSource::start()
 {
-
+    for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
+        mPool->addTask(mTask);
+    }
 }
 
 static inline int startCode3(uint8_t* buf)

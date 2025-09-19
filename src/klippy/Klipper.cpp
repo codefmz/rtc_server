@@ -1,4 +1,6 @@
-#include "KlipperCommand.h"
+#include "Klipper.h"
+#include "RtcPacket.h"
+#include "Poller.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -7,8 +9,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include "Poller.h"
-#include "RtcPacket.h"
 
 #define SOCKET_SESSION_ID       1021 //订阅消息id
 #define SEND_SOCKET_ID          1022 //发送消息id
@@ -16,7 +16,7 @@
 #define SOCKET_END_CHAR         0x3
 #define WAIT_TIME_PER           1 /* 每次等待时长，秒*/
 
-int KlipperCommand::init(const char *socketPath) {
+int Klipper::init(const char *socketPath, Poller *mPoller) {
     if (sock > 0) {
         return 0;
     }
@@ -49,7 +49,7 @@ err:
     return -1;
 }
 
-int KlipperCommand::processMove(void *input, void *output)
+int Klipper::processMove(void *input, void *output)
 {
     RTC_Pos_Param *pos = (RTC_Pos_Param*)((uintptr_t)input + INPUT_HEADER_SIZE);
     double x = pos->x;
@@ -72,7 +72,7 @@ int KlipperCommand::processMove(void *input, void *output)
     return 0;
 }
 
-int KlipperCommand::processXyZero(void *input, void *output)
+int Klipper::processXyZero(void *input, void *output)
 {
     std::string cmd = "G28 x y";
 
@@ -88,7 +88,7 @@ int KlipperCommand::processXyZero(void *input, void *output)
     return 0;
 }
 
-int KlipperCommand::processZZero(void *input, void *output)
+int Klipper::processZZero(void *input, void *output)
 {
     std::string cmd = "G28 z";
 
@@ -104,18 +104,18 @@ int KlipperCommand::processZZero(void *input, void *output)
     return 0;
 }
 
-void KlipperCommand::readCallBack(void *arg)
+void Klipper::readCallBack(void *arg)
 {
-    KlipperCommand *klippy = (KlipperCommand*)arg;
+    Klipper *klippy = (Klipper*)arg;
     klippy->handleRead();
 }
 
-void KlipperCommand::handleRead()
+void Klipper::handleRead()
 {
     ssize_t len = recv(sock, buffer, BUFFER_SIZE - 1, 0);
     std::string message(buffer, len);
 
-    std::cout << "KlipperCommand::readCallBack buffer = " << std::string(buffer, len) << std::endl;
+    std::cout << "Klipper::readCallBack buffer = " << std::string(buffer, len) << std::endl;
 
     Json::Value response;
     if (!str2Json(message, response)) {
@@ -125,7 +125,7 @@ void KlipperCommand::handleRead()
     parseJson(response);
 }
 
-void KlipperCommand::disconnect() {
+void Klipper::disconnect() {
     if (sock > 0) {
         close(sock); 
         sock = -1;
@@ -133,7 +133,7 @@ void KlipperCommand::disconnect() {
 }
 
 // 获取打印状态 打印状态 当前打印层  打印时间
-int KlipperCommand::queryStatus() {
+int Klipper::queryStatus() {
     std::string subscribeGCode = R"(
     {
         "id": 1021,
@@ -154,9 +154,7 @@ int KlipperCommand::queryStatus() {
     return 0;
 }
 
-#include <iostream>
-
-int KlipperCommand::sendGCode(std::string& gcode) {
+int Klipper::sendGCode(std::string& gcode) {
     std::cout << "sendGCode: " << gcode << std::endl;
     gcode.push_back(char(SOCKET_END_CHAR));
     ssize_t sendLen = ::send(sock, gcode.c_str(), gcode.size(), 0);
@@ -168,7 +166,7 @@ int KlipperCommand::sendGCode(std::string& gcode) {
     return 0;
 }
 
-bool KlipperCommand::str2Json(const std::string& message, Json::Value& response_json) {
+bool Klipper::str2Json(const std::string& message, Json::Value& response_json) {
     Json::CharReaderBuilder reader;
     std::string errors;
     std::istringstream stream(message);
@@ -184,7 +182,7 @@ bool KlipperCommand::str2Json(const std::string& message, Json::Value& response_
     return true;
 }
 
-void KlipperCommand::parseJson(const Json::Value &json)
+void Klipper::parseJson(const Json::Value &json)
 {
     if (!json.isMember("params") ||
         !json["params"].isMember("status") ||
@@ -204,7 +202,7 @@ void KlipperCommand::parseJson(const Json::Value &json)
     }
 }
 
-int KlipperCommand::sendCmd(std::string &cmd, bool block)
+int Klipper::sendCmd(std::string &cmd, bool block)
 {
     static std::string temp = R"({
         "id": 1023, 

@@ -1,5 +1,6 @@
 #include "Webrtc.h"
 #include "rtc/rtc.hpp"
+#include "plog/Log.h"
 #include <atomic>
 #include <chrono>
 #include <iostream>
@@ -150,7 +151,7 @@ void Webrtc::createRecvSocket()
 void Webrtc::processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataChannel> wdc)
 {
     if (std::holds_alternative<std::string>(data)) {
-        std::cout << " Webrtc error, recved std::string " << std::endl;
+        PLOGE << " Webrtc error, recved std::string. ";
         return;
     }
 
@@ -166,18 +167,18 @@ void Webrtc::processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataCh
     auto iter = cmdProcessor.find(input->cmd);
     if (iter == cmdProcessor.end()) {
         dc->send((std::byte*)outputBuf, outputBuf->len);
-        std::cout << " cmd not found cmd: " << input->cmd << std::endl;
+        PLOGE << " cmd not found cmd: " << input->cmd;
         return;
     }
 
     int ret = iter->second(input, outputBuf);
     if (ret < 0) {
         dc->send((std::byte*)outputBuf, outputBuf->len);
-        std::cout << " cmd process failed cmd: " << input->cmd << std::endl;
+        PLOGE << " cmd process failed cmd: " << input->cmd;
         return;
     }
 
-    std::cout << " outputbuf->ret = " << outputBuf->ret << std::endl;
+    PLOGI << " outputbuf->ret = " << outputBuf->ret;
     dc->send((std::byte*)outputBuf, outputBuf->len);
 }
 

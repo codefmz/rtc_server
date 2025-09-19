@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 constexpr uint16_t FPS = 30;
 constexpr uint32_t FRAME_WIDTH = 1920;
@@ -19,6 +20,8 @@ namespace Utils {
 
 /* 根据摄像头名字获取设备名 */
 std::string getCameraDevName(const std::string &camName);
+
+void getVideoDevs(std::vector<std::string> &devs);
 
 };
 

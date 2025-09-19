@@ -31,6 +31,7 @@ public:
     TimerId addTimedEventRunAt(TimerEvent* event, Timestamp when);
     TimerId addTimedEventRunEvery(TimerEvent* event, TimeInterval interval);
     bool removeTimedEvent(TimerId timerId);
+
     bool addIOEvent(IOEvent* event);
     bool updateIOEvent(IOEvent* event);
     bool removeIOEvent(IOEvent* event);
