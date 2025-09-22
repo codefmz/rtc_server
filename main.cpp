@@ -67,7 +67,7 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
         RTC_Input *in = (RTC_Input*)input;
         std::string devName((char *)in->buf, in->len - INPUT_HEADER_SIZE);
 
-        PLOGE << "Open show video " << devName;
+        PLOGD << "Open show video " << devName;
         int ret = source->init(devName);
         if (ret != 0) {
             PLOG_ERROR << "init dev " << devName << "failed, errno = " << errno;
@@ -85,7 +85,7 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
     Webrtc::Instance().addCmdProcessor(CMD_STOP_SHOW_VIDEO, [=] (void* input, void* output) {
         RTC_Input *in = (RTC_Input*)input;
         std::string devName((char *)in->buf, in->len - INPUT_HEADER_SIZE);
-        PLOGE << "Stop show video " << devName;
+        PLOGD << "Stop show video " << devName;
 
         // rtpSink->stop();
         int ret = source->deInit();
@@ -105,7 +105,7 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
 int main() {
     static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
     static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("./rtc_server.log", 80000000, 100);
-    plog::init(plog::error, &consoleAppender).addAppender(&fileAppender); 
+    plog::init(plog::debug, &consoleAppender).addAppender(&fileAppender); 
 
     std::shared_ptr<EventScheduler> scheduler(EventScheduler::createNew(EventScheduler::POLLER_SELECT));
     std::shared_ptr<Klipper> klipper = std::make_shared<Klipper>();

@@ -87,7 +87,7 @@ void H264RtpSink::handleFrame(Frame* frame)
     }
     mTimestamp += mClockRate/mFps;
 
-    PLOGE << "handleFrame frameSize = " << frameSize;
+    // PLOGD << "handleFrame frameSize = " << frameSize;
 }
 
 void H264RtpSink::start()

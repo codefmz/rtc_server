@@ -77,7 +77,7 @@ void V4l2MediaSource::readFrame()
         return;
     }
 
-    PLOGE << "readFrame thread id: " << gettid();
+    // PLOGD << "readFrame thread id: " << gettid();
     Frame* frame = mFrameInputQueue.front();
     for (auto i = 0; i < 1; ++i) {
         int ret = v4l2_poll(mFd);

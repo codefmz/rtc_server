@@ -44,6 +44,8 @@ Webrtc::Webrtc()
 {
     createRecvSocket();
     outputBuf = new RTC_Output;
+
+    addCmdProcessor(CMD_DISCONNECT, std::bind(&Webrtc::clientDisconnected, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 Webrtc::~Webrtc()
@@ -114,6 +116,10 @@ void Webrtc::createPeerConnection(std::weak_ptr<rtc::WebSocket> wclient, rtc::me
             media.addH264Codec(96); // Must match the payload type of the external h264 RTP stream
             media.addSSRC(ssrc, "video-send");
             auto trackTmp = pc->addTrack(media);
+            trackTmp->onClosed([]() {
+                PLOGD << " Clint Track is closed.";
+            });
+        
             std::atomic_store(&track, trackTmp);
 
             peerConnectionSetup(pc, wclient, id);
@@ -182,29 +188,26 @@ void Webrtc::processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataCh
     dc->send((std::byte*)outputBuf, outputBuf->len);
 }
 
-void Webrtc::recvMedia()
+int Webrtc::clientDisconnected(void *input, void *output)
 {
-    //Receive from UDP
-    char buffer[BUFFER_SIZE];
-    int len;
-    while ((len = recv(sock, buffer, BUFFER_SIZE, 0)) >= 0) {
-        if (len < sizeof(rtc::RtpHeader) || !track|| !track->isOpen()) {
-            continue;
-        }
-        auto rtp = reinterpret_cast<rtc::RtpHeader *>(buffer);
-        rtp->setSsrc(ssrc);
-        track->send(reinterpret_cast<const std::byte *>(buffer), len);
-    }
+    PLOGD << "clientDisconnected";
+    track->close();
+    track = nullptr;
+    RTC_Output *out = reinterpret_cast<RTC_Output *>(output);
+    out->ret = RET_OK;
+    out->len = OUTPUT_HEADER_SIZE;
+
+    return RET_OK;  
 }
 
 void Webrtc::peerConnectionSetup(std::shared_ptr<rtc::PeerConnection> pc, std::weak_ptr<rtc::WebSocket> wws, const std::string & id)
 {
     pc->onStateChange([](rtc::PeerConnection::State state) {
-        std::cout << "PeerConnection State: " << state << std::endl;
+        PLOGD << "PeerConnection State: " << state;
     });
 
     pc->onGatheringStateChange([](rtc::PeerConnection::GatheringState state) {
-        std::cout << "Gathering State: " << state << std::endl;
+        PLOGD << "Gathering State: " << state;
     });
 
     pc->onLocalDescription([this, wws](rtc::Description description) {

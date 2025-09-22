@@ -26,8 +26,6 @@ public:
 
     void start(int port);
 
-    void recvMedia();
-
     void stop();
 
     void addCmdProcessor(RTC_CMD cmd, std::function<int(void *, void *)> processor) {
@@ -37,8 +35,8 @@ public:
     void sendVideoPacket(RtpPacket *packet) {
         packet->mRtpHeadr->ssrc = ssrc;
         if (track && track->isOpen()) {
-            PLOGE << " send video packet size = " << packet->mSize;
-            track->send(reinterpret_cast<const std::byte *>(packet->mBuffer), packet->mSize);
+            bool ret = track->send(reinterpret_cast<const std::byte *>(packet->mBuffer), packet->mSize);
+            // PLOGD << " send video packet size = " << packet->mSize << " ret = " << ret;
         }
     }
 
@@ -59,6 +57,7 @@ public:
         }
     }
 
+
 private:
     Webrtc();
     ~Webrtc();
@@ -73,6 +72,7 @@ private:
 
     void processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataChannel> wdc);
 
+    int clientDisconnected(void *input, void *output);
 private:
     std::shared_ptr<rtc::WebSocketServer> server;
     std::shared_ptr<rtc::WebSocket> client;

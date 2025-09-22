@@ -10,6 +10,7 @@ enum RTC_CMD {
     CMD_KLIPPY_XY,
     CMD_KLIPPY_Z,
     CMD_SHOW_DEVS,
+    CMD_DISCONNECT,
     CMD_BUTT
 };
 
