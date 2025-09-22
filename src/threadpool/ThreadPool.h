@@ -46,17 +46,19 @@ public:
 
     void addTask(Task& task);
 
+    void createThreads();
+    void cancelThreads();
+
     class MThread : public Thread
     {
     protected:
         virtual void run(void *arg);
     };
 private:
-    void createThreads();
-    void cancelThreads();
     void handleTask();
 
 private:
+    int mNum;
     std::queue<Task> mTaskQueue;
     std::mutex mMutex;
     std::condition_variable mCondition;

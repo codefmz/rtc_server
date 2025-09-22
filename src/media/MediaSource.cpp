@@ -2,10 +2,6 @@
 
 MediaSource::MediaSource(std::shared_ptr<ThreadPool> pool) : mPool(pool)
 {
-    for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
-        mFrameInputQueue.push(&mFrames[i]);
-    }
-
     mTask.setTaskCallback(taskCallback, this);
 }
 

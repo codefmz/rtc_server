@@ -1,5 +1,6 @@
 #ifndef _H264_MEDIA_SINK_H_
 #define _H264_MEDIA_SINK_H_
+
 #include <stdint.h>
 #include "RtpSink.h"
 
@@ -10,6 +11,8 @@ public:
     virtual ~H264RtpSink();
 
     virtual void handleFrame(Frame* frame);
+
+    void start();
 
 private:
     RtpPacket mRtpPacket;

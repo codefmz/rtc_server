@@ -3,22 +3,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
-#include "V4l2MediaSource.h"
 #include <iostream>
+#include "V4l2MediaSource.h"
+#include "plog/Log.h"
 
-V4l2MediaSource::V4l2MediaSource(std::shared_ptr<ThreadPool> pool, const std::string& dev) :
+V4l2MediaSource::V4l2MediaSource(std::shared_ptr<ThreadPool> pool) :
     MediaSource(pool),
     mPool(pool),
-    mDev(dev),
     mWidth(FRAME_WIDTH),
     mHeight(FRAME_HEIGHT)
 {
-    bool ret;
-
     setFps(FPS);
-
-    ret = videoInit();
-    assert(ret == true);
 }
 
 V4l2MediaSource::~V4l2MediaSource()
@@ -26,11 +21,28 @@ V4l2MediaSource::~V4l2MediaSource()
     videoExit();
 }
 
-void V4l2MediaSource::start()
+int V4l2MediaSource::init(const std::string &dev)
 {
+    int ret = videoInit(dev);
+
+    for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
+        mFrameInputQueue.push(&mFrames[i]);
+    }
+
+    mPool->createThreads();
     for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
         mPool->addTask(mTask);
     }
+
+    return ret;
+}
+
+int V4l2MediaSource::deInit()
+{
+    mPool->cancelThreads();
+    mFrameInputQueue = std::queue<Frame*>();
+    mFrameOutputQueue = std::queue<Frame*>();
+    return videoExit();
 }
 
 static inline int startCode3(uint8_t* buf)
@@ -53,18 +65,13 @@ static inline int startCode4(uint8_t* buf)
 
 void V4l2MediaSource::readFrame()
 {
-    using Clock = std::chrono::high_resolution_clock;
-    using Milliseconds = std::chrono::milliseconds;
-    auto start = Clock::now();
-    auto end = Clock::now();
-    auto duration = std::chrono::duration_cast<Milliseconds>(end - start);
-
     std::lock_guard<std::mutex> lock(mMutex);
     if (mFrameInputQueue.empty()) {
-        std::cout << "V4l2MediaSource::readFrame mAVFrameInputQueue.empty()" << std::endl;
+        PLOGE << "V4l2MediaSource::readFrame mAVFrameInputQueue.empty()";
         return;
     }
 
+    PLOGE << "readFrame thread id: " << std::this_thread::get_id();
     Frame* frame = mFrameInputQueue.front();
     for (auto i = 0; i < 1; ++i) {
         int ret = v4l2_poll(mFd);
@@ -79,7 +86,6 @@ void V4l2MediaSource::readFrame()
 
         parseH264(frame, (uint8_t*)mV4l2BufUnit->start, mV4l2BufUnit->length);
         //不知道为什么，在t113 或者 x2600上这里需要占着cpu等一会，去掉后会出现 errno = 51 或者 53
-        // LOG_INFO("");
         ret = v4l2_qbuf(mFd, mV4l2BufUnit);
         if (ret < 0) {
             return;
@@ -87,103 +93,117 @@ void V4l2MediaSource::readFrame()
     }
     mFrameInputQueue.pop();
     mFrameOutputQueue.push(frame);
-
-    end = Clock::now();
-    duration = std::chrono::duration_cast<Milliseconds>(end - start);
-    // std::cout << "执行时间: " << duration.count() << " 毫秒" << std::endl;
 }
 
-bool V4l2MediaSource::videoInit()
+int V4l2MediaSource::videoInit(const std::string &dev)
 {
     int ret;
     char devName[100];
     struct v4l2_capability cap;
 
-    mFd = v4l2_open(mDev.c_str(), O_RDWR);
+    mFd = v4l2_open(dev.c_str(), O_RDWR);
     if(mFd < 0) {
-        return false;
+        PLOGE << "v4l2_open " << dev << " failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_querycap(mFd, &cap);
     if(ret < 0) {
-        return false;
+        PLOGE << "v4l2_querycap " << dev << " failed, errno = " << errno;
+        return ret;
     }
 
     if(!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-        return false;
+        PLOGE << " V4L2_CAP_VIDEO_CAPTURE not supported.";
+        return -1;
     }
 
     ret = v4l2_enum_fmt(mFd, V4L2_PIX_FMT_H264, V4L2_BUF_TYPE_VIDEO_CAPTURE);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_enum_fmt V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_s_fmt(mFd, &mWidth, &mHeight, V4L2_PIX_FMT_H264, V4L2_BUF_TYPE_VIDEO_CAPTURE);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_s_fmt V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     struct v4l2_streamparm parm = { 0 };
     parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     parm.parm.capture.timeperframe.numerator = 1;
-    parm.parm.capture.timeperframe.denominator = FPS;  // 设置为10fps
+    parm.parm.capture.timeperframe.denominator = FPS;
     ret = v4l2_s_parm(mFd, &parm);
     if (ret < 0) {
-        return false;
+        PLOGE << " v4l2_s_parm V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return ret;
     }
 
     mV4l2Buf = v4l2_reqbufs(mFd, V4L2_BUF_TYPE_VIDEO_CAPTURE, 4);
     if(!mV4l2Buf) {
-        return false;
+        PLOGE << " v4l2_reqbufs V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_querybuf(mFd, mV4l2Buf);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_querybuf V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_mmap(mFd, mV4l2Buf);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_mmap V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_qbuf_all(mFd, mV4l2Buf);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_qbuf_all V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_streamon(mFd);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_streamon V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
     ret = v4l2_poll(mFd);
     if(ret < 0) {
-        return false;
+        PLOGE << " v4l2_poll V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        return -1;
     }
 
-    return true;
+    return 0;
 }
 
-bool V4l2MediaSource::videoExit()
+int V4l2MediaSource::videoExit()
 {
     int ret;
 
     ret = v4l2_streamoff(mFd);
-    if(ret < 0)
-        return false;
+    if (ret < 0) {
+        PLOGE << "streamoff failed, errno = " << errno;
+        return ret;
+    }
 
     ret = v4l2_munmap(mFd, mV4l2Buf);
-    if(ret < 0)
-        return false;
+    if (ret < 0) {
+        PLOGE << "munmap failed, errno = " << errno;
+        return ret;
+    }
 
-    ret = v4l2_relbufs(mV4l2Buf);
-    if(ret < 0)
-        return false;
+    ret = v4l2_relbufs(mFd, mV4l2Buf);
+    if(ret < 0) {
+        PLOGE << "relbufs failed, errno = " << errno;
+        return ret;
+    }
+    ret = v4l2_close(mFd);
 
-    v4l2_close(mFd);
-
-    return true;
+    mFd = -1;
+    return ret;
 }
 
 void V4l2MediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
@@ -193,16 +213,10 @@ void V4l2MediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
     int num = 0;
     int offset = 0;
 
-
-    // std::cout << " length = " << length << std::endl;
     if (startCode4(h264Data)) {
         offset = 4;
-        // std::cout << "start code 4" << std::endl; 
     } else if (startCode3(h264Data)) {
         offset = 3;
-        // std::cout << "start code 3" << std::endl; 
-    } else {
-        // std::cout << "start code error." << std::endl; 
     }
  
     while (i + offset <= length) {

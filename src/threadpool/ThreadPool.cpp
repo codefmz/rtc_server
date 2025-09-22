@@ -1,8 +1,7 @@
 #include "ThreadPool.h"
 
-ThreadPool::ThreadPool(int num) : mThreads(num), mQuit(false)
+ThreadPool::ThreadPool(int num) : mNum(num)
 {
-    createThreads();
 }
 
 ThreadPool::~ThreadPool()
@@ -44,6 +43,8 @@ void ThreadPool::handleTask()
 
 void ThreadPool::createThreads()
 {
+    mQuit = false;
+    mThreads = std::vector<MThread>(mNum);
     for(std::vector<MThread>::iterator it = mThreads.begin(); it != mThreads.end(); ++it) {
         (*it).start(this);
     }
@@ -63,7 +64,6 @@ void ThreadPool::cancelThreads()
     for(std::vector<MThread>::iterator it = mThreads.begin(); it != mThreads.end(); ++it) {
         (*it).join();
     }
-
     mThreads.clear();
 }
 

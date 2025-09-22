@@ -138,24 +138,19 @@ int v4l2_enum_fmt(int fd, unsigned int fmt, enum v4l2_buf_type type)
 int v4l2_s_fmt(int fd, int* width, int* height, unsigned int fmt, enum v4l2_buf_type type)
 {
     struct v4l2_format v4l2_fmt;
-    struct v4l2_pix_format pixfmt;
 
     memset(&v4l2_fmt, 0, sizeof(struct v4l2_format));
     v4l2_fmt.type = type;
 
-    memset(&pixfmt, 0, sizeof(pixfmt));
-
-    pixfmt.width = *width;
-    pixfmt.height = *height;
-    pixfmt.pixelformat = fmt;
-
     // pixfmt.sizeimage = (*width * *height * get_pixel_depth(fmt)) / 8;
     // pixfmt.sizeimage = 0;
 
-    pixfmt.field = V4L2_FIELD_NONE;
+    v4l2_fmt.fmt.pix.width = *width;
+    v4l2_fmt.fmt.pix.height = *height;
+    v4l2_fmt.fmt.pix.pixelformat = fmt;
+    v4l2_fmt.fmt.pix.field = V4L2_FIELD_NONE;
 
-    v4l2_fmt.fmt.pix = pixfmt;
-
+    PLOGE << " *width = " << *width << " *height = " << *height;
     if (ioctl(fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
         return -1;
     }
@@ -263,14 +258,20 @@ int v4l2_munmap(int fd, struct v4l2_buf* v4l2_buf)
     return 0;
 }
 
-
-
-int v4l2_relbufs(struct v4l2_buf* v4l2_buf)
+int v4l2_relbufs(int fd, struct v4l2_buf* v4l2_buf)
 {
-    int i = 0;
-
     free(v4l2_buf->buf);
     free(v4l2_buf);
+
+    struct v4l2_requestbuffers req;
+
+    req.count = 0; // 让内核释放缓冲区
+    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    req.memory = V4L2_MEMORY_MMAP;
+
+    if (ioctl(fd, VIDIOC_REQBUFS, &req) < 0) {
+        return -1;
+    }
 
     return 0;
 }

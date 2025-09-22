@@ -2,16 +2,15 @@
 #include <string.h>
 #include <iostream>
 #include "H264RtpSink.h"
+#include "plog/Log.h"
 
 H264RtpSink::H264RtpSink(std::shared_ptr<EventScheduler> scheduler, std::shared_ptr<MediaSource> mediaSource) :
     RtpSink(scheduler, mediaSource, RTP_PAYLOAD_TYPE_H264), mClockRate(90000), mFps(mediaSource->getFps())
 {
-    start(1000 / mFps);
 }
 
 H264RtpSink::~H264RtpSink()
 {
-
 }
 
 void H264RtpSink::handleFrame(Frame* frame)
@@ -86,4 +85,9 @@ void H264RtpSink::handleFrame(Frame* frame)
         }
     }
     mTimestamp += mClockRate/mFps;
+}
+
+void H264RtpSink::start()
+{
+    RtpSink::start(1000 / mFps);
 }

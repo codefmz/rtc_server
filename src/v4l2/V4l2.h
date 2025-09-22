@@ -39,7 +39,7 @@ int v4l2_mmap(int fd, struct v4l2_buf* v4l2_buf);
 
 int v4l2_munmap(int fd, struct v4l2_buf* v4l2_buf);
 
-int v4l2_relbufs(struct v4l2_buf* v4l2_buf);
+int v4l2_relbufs(int fd, struct v4l2_buf* v4l2_buf);
 
 int v4l2_streamon(int fd);
 

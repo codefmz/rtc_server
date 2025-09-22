@@ -19,11 +19,12 @@ public:
 
     void setSendFrameCallback(SendPacketCallback cb);
 
+    void stop();
+
 protected:
     virtual void handleFrame(Frame* frame) = 0;
     void sendRtpPacket(RtpPacket* packet);
     void start(int ms);
-    void stop();
 
 private:
     static void timeoutCallback(void*);

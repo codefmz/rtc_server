@@ -10,21 +10,22 @@
 class V4l2MediaSource : public MediaSource
 {
 public:
-    V4l2MediaSource(std::shared_ptr<ThreadPool> pool, const std::string& dev);
+    V4l2MediaSource(std::shared_ptr<ThreadPool> pool);
     virtual ~V4l2MediaSource();
 
-    void start();
+    int init(const std::string &dev);
+
+    int deInit();
 protected:
     virtual void readFrame();
 
 private:
-    bool videoInit();
-    bool videoExit();
+    int videoInit(const std::string &dev);
+    int videoExit();
     void parseH264(Frame* frame, uint8_t* h264Data, int length);
 
 private:
     std::shared_ptr<ThreadPool> mPool;
-    std::string mDev;
     int mFd;
     int mWidth;
     int mHeight;

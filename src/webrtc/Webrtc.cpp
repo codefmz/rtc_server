@@ -57,20 +57,20 @@ Webrtc::~Webrtc()
 void Webrtc::clientConnected(std::shared_ptr<WebSocket> client)
 {
     if (auto addr = client->remoteAddress()) {
-        cout << "WebSocketServer: Client remote address is " << *addr << endl;
+        PLOGI << "WebSocketServer: Client remote address is " << *addr;
     }
 
     client->onOpen([wclient = make_weak_ptr(client)]() {
-        cout << "WebSocketServer: Client connection open" << endl;
+        PLOGI << "WebSocketServer: Client connection open.";
         if (auto client = wclient.lock()) {
             if (auto path = client->path()) {
-                cout << "WebSocketServer: Requested path is " << *path << endl;
+                PLOGI << "WebSocketServer: Requested path is " << *path;
             }
         }
     });
 
     client->onClosed([this]() {
-        cout << "WebSocketServer: Client connection closed" << endl;
+        PLOGI << "WebSocketServer: Client connection closed";
         this->client = nullptr;
     });
 
@@ -86,12 +86,12 @@ void Webrtc::createPeerConnection(std::weak_ptr<rtc::WebSocket> wclient, rtc::me
 {
     auto client = wclient.lock();
     if (!client) {
-        cout << "WebSocketServer: Client is gone" << endl;
+        PLOGI << "WebSocketServer: Client is gone.";
         return;
     }
 
     if (std::holds_alternative<std::string>(message)) {
-        cout << "WebSocketServer: Received string message: " << std::get<std::string>(message) << endl;
+        PLOGI << "WebSocketServer: Received string message: " << std::get<std::string>(message);
         json data = json::parse(std::get<std::string>(message));
         auto it = data.find("id");
         if (it == data.end()) {
@@ -106,7 +106,7 @@ void Webrtc::createPeerConnection(std::weak_ptr<rtc::WebSocket> wclient, rtc::me
 
         auto type = it->get<std::string>();
         if (type == "offer") {
-            cout << "Answering to " + id << endl;
+            PLOGI << "Answering to " << id;
             rtc::Configuration config;
             pc = std::make_shared<rtc::PeerConnection>(config);
 
@@ -128,7 +128,7 @@ void Webrtc::createPeerConnection(std::weak_ptr<rtc::WebSocket> wclient, rtc::me
             pc->addRemoteCandidate(rtc::Candidate(sdp, mid));
         }
     } else {
-        cout << "WebSocketServer: Received bytes message" << endl;
+        PLOGI << "WebSocketServer: Received bytes message" << endl;
     }
 }
 
@@ -229,13 +229,13 @@ void Webrtc::peerConnectionSetup(std::shared_ptr<rtc::PeerConnection> pc, std::w
     });
 
     pc->onDataChannel([id, this](shared_ptr<rtc::DataChannel> dc) {
-        std::cout << "DataChannel from " << id << " received with label \"" << dc->label() << "\"" << std::endl;
+        PLOGI << "DataChannel from " << id << " received with label \"" << dc->label() << "\"";
         dc->onOpen([id, wdc = make_weak_ptr(dc)]() {
-            std::cout << "DataChannel from " << id << " opened" << std::endl;
+            PLOGI << "DataChannel from " << id << " opened.";
         });
 
         dc->onClosed([id, this]() { 
-            std::cout << "DataChannel from " << id << " closed" << std::endl;
+            PLOGI << "DataChannel from " << id << " closed.";
             this->mDc = nullptr;
         });
 
