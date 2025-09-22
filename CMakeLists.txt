@@ -28,6 +28,7 @@ link_directories(
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 add_subdirectory(src)
+add_subdirectory(test)
 
 add_executable(rtc_server main.cpp)
 target_link_libraries(rtc_server webrtc ssl crypto dl v4l2 klipper) # ssl crypto dl 是 werbrtc 库libdatachannel依赖

@@ -7,6 +7,7 @@
 H264RtpSink::H264RtpSink(std::shared_ptr<EventScheduler> scheduler, std::shared_ptr<MediaSource> mediaSource) :
     RtpSink(scheduler, mediaSource, RTP_PAYLOAD_TYPE_H264), mClockRate(90000), mFps(mediaSource->getFps())
 {
+    start();
 }
 
 H264RtpSink::~H264RtpSink()
@@ -85,6 +86,8 @@ void H264RtpSink::handleFrame(Frame* frame)
         }
     }
     mTimestamp += mClockRate/mFps;
+
+    PLOGE << "handleFrame frameSize = " << frameSize;
 }
 
 void H264RtpSink::start()

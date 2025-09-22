@@ -48,7 +48,7 @@ void RtpSink::timeoutCallback(void* arg)
     if(!frame) {
         return;
     }
-    PLOGE << "timeoutCallback";
+
     rtpSink->handleFrame(frame);
     rtpSink->mMediaSource->putFrame(frame);
 }

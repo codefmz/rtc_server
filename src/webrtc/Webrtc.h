@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <cstring>
 
+#include "plog/Log.h"
 
 typedef int SOCKET;
 
@@ -36,6 +37,7 @@ public:
     void sendVideoPacket(RtpPacket *packet) {
         packet->mRtpHeadr->ssrc = ssrc;
         if (track && track->isOpen()) {
+            PLOGE << " send video packet size = " << packet->mSize;
             track->send(reinterpret_cast<const std::byte *>(packet->mBuffer), packet->mSize);
         }
     }

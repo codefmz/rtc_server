@@ -74,7 +74,7 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
             return ret;
         }
 
-        rtpSink->start();
+        // rtpSink->start();
         RTC_Output *rtc = (RTC_Output*)output;
         rtc->ret = RET_OK;
         rtc->len = OUTPUT_HEADER_SIZE;
@@ -87,13 +87,12 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
         std::string devName((char *)in->buf, in->len - INPUT_HEADER_SIZE);
         PLOGE << "Stop show video " << devName;
 
-        rtpSink->stop();
+        // rtpSink->stop();
         int ret = source->deInit();
         if (ret != 0) {
             PLOG_ERROR << "Dinit dev " << devName << "failed, errno = " << errno;
             return ret;
         }
-
 
         RTC_Output *rtc = (RTC_Output*)output;
         rtc->ret = RET_OK;
@@ -105,7 +104,7 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
 
 int main() {
     static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-    static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("./test.txt", 8000, 3);
+    static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("./rtc_server.log", 80000000, 100);
     plog::init(plog::error, &consoleAppender).addAppender(&fileAppender); 
 
     std::shared_ptr<EventScheduler> scheduler(EventScheduler::createNew(EventScheduler::POLLER_SELECT));

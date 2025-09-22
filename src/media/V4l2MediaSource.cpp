@@ -14,6 +14,10 @@ V4l2MediaSource::V4l2MediaSource(std::shared_ptr<ThreadPool> pool) :
     mHeight(FRAME_HEIGHT)
 {
     setFps(FPS);
+
+    for (int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
+        mFrameInputQueue.push(&mFrames[i]);
+    }
 }
 
 V4l2MediaSource::~V4l2MediaSource()
@@ -23,10 +27,13 @@ V4l2MediaSource::~V4l2MediaSource()
 
 int V4l2MediaSource::init(const std::string &dev)
 {
-    int ret = videoInit(dev);
-
-    for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
-        mFrameInputQueue.push(&mFrames[i]);
+    int ret = 0;
+    auto iter = devFdMap.find(dev);
+    if (iter != devFdMap.end()) {
+        mFd = iter->second;
+    } else {
+        ret = videoInit(dev);
+        devFdMap.insert(std::make_pair(dev, mFd));
     }
 
     mPool->createThreads();
@@ -40,9 +47,8 @@ int V4l2MediaSource::init(const std::string &dev)
 int V4l2MediaSource::deInit()
 {
     mPool->cancelThreads();
-    mFrameInputQueue = std::queue<Frame*>();
-    mFrameOutputQueue = std::queue<Frame*>();
-    return videoExit();
+    // return videoExit();
+    return 0;
 }
 
 static inline int startCode3(uint8_t* buf)
@@ -71,7 +77,7 @@ void V4l2MediaSource::readFrame()
         return;
     }
 
-    PLOGE << "readFrame thread id: " << std::this_thread::get_id();
+    PLOGE << "readFrame thread id: " << gettid();
     Frame* frame = mFrameInputQueue.front();
     for (auto i = 0; i < 1; ++i) {
         int ret = v4l2_poll(mFd);
@@ -200,8 +206,8 @@ int V4l2MediaSource::videoExit()
         PLOGE << "relbufs failed, errno = " << errno;
         return ret;
     }
-    ret = v4l2_close(mFd);
 
+    ret = v4l2_close(mFd);
     mFd = -1;
     return ret;
 }
