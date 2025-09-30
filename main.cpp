@@ -121,16 +121,15 @@ int main() {
 
     rtpSink->setSendFrameCallback(sendPacket);
 
+    klipper->onPosChange([](double x, double y, double z) {
+        RTC_Pos_Param param;
+        param.x = x;
+        param.y = y;
+        param.z = z;
+        Webrtc::Instance().sendCtlPacket(RET_KLIPPY_POS, (uint8_t*)&param, sizeof(param));
+    });
+
     Webrtc::Instance().start(48080);
     scheduler->loop();
     Webrtc::Instance().stop();
-
-
-    // klipper->onPosChange([](double x, double y, double z) {
-    //     RTC_Pos_Param param;
-    //     param.x = x;
-    //     param.y = y;
-    //     param.z = z;
-    //     Webrtc::Instance().sendCtlPacket(RET_KLIPPY_POS, (uint8_t*)&param, sizeof(param));
-    // });
 }
