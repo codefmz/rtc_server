@@ -2,6 +2,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+
 #include <string.h>
 #include <iostream>
 #include "V4l2MediaSource.h"
@@ -77,16 +80,18 @@ void V4l2MediaSource::readFrame()
         return;
     }
 
-    // PLOGD << "readFrame thread id: " << gettid();
+    // PLOGD << "readFrame thread id: " << syscall(SYS_gettid);
     Frame* frame = mFrameInputQueue.front();
     for (auto i = 0; i < 1; ++i) {
         int ret = v4l2_poll(mFd);
         if (ret < 0) {
+            PLOGE << " poll fail, errno = " << errno;
             return;
         }
 
         mV4l2BufUnit = v4l2_dqbuf(mFd, mV4l2Buf);
         if (!mV4l2BufUnit) {
+            PLOGE << " dqbuf fail, errno = " << errno;
             return;
         }
 
@@ -94,6 +99,7 @@ void V4l2MediaSource::readFrame()
         //不知道为什么，在t113 或者 x2600上这里需要占着cpu等一会，去掉后会出现 errno = 51 或者 53
         ret = v4l2_qbuf(mFd, mV4l2BufUnit);
         if (ret < 0) {
+            PLOGE << " qbuf fail, errno = " << errno;
             return;
         }
     }
@@ -173,12 +179,6 @@ int V4l2MediaSource::videoInit(const std::string &dev)
     ret = v4l2_streamon(mFd);
     if(ret < 0) {
         PLOGE << " v4l2_streamon V4L2_PIX_FMT_H264 failed, errno = " << errno;
-        return -1;
-    }
-
-    ret = v4l2_poll(mFd);
-    if(ret < 0) {
-        PLOGE << " v4l2_poll V4L2_PIX_FMT_H264 failed, errno = " << errno;
         return -1;
     }
 

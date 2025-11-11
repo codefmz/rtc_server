@@ -103,9 +103,9 @@ void addShowVideoCmdProcess(std::shared_ptr<V4l2MediaSource> source, std::shared
 }
 
 int main() {
-    static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
+    // static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
     static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("./rtc_server.log", 80000000, 100);
-    plog::init(plog::debug, &consoleAppender).addAppender(&fileAppender); 
+    plog::init(plog::debug, &fileAppender); 
 
     std::shared_ptr<EventScheduler> scheduler(EventScheduler::createNew(EventScheduler::POLLER_SELECT));
     std::shared_ptr<Klipper> klipper = std::make_shared<Klipper>();

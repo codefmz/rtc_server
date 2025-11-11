@@ -311,6 +311,7 @@ int v4l2_qbuf(int fd, struct v4l2_buf_unit* buf)
     v4l2_buf.index = buf->index;
 
     if (ioctl(fd, VIDIOC_QBUF, &v4l2_buf) < 0) {
+        PLOGE << " vidioc qbuf fail, index = " << buf->index << " , errno = " << errno;
         return -1;
     }
 
@@ -323,8 +324,8 @@ int v4l2_qbuf_all(int fd, struct v4l2_buf* v4l2_buf)
 
     for(i = 0; i < v4l2_buf->nr_bufs; ++i) {
         //不知道为什么，在t113 或者 x2600上这里需要占着cpu等一会，去掉后会出现 errno = 51 或者 53
-        LOG_DEBUG << "v4l2_qbuf, i = " << i;
         if(v4l2_qbuf(fd, &v4l2_buf->buf[i])) {
+            PLOGE << "qbuf fail, i = " << i << " errno = " << errno;
             return -1;
         }
     }
