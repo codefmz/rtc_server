@@ -9,48 +9,70 @@
 #include <iostream>
 #include "V4l2MediaSource.h"
 #include "plog/Log.h"
+#include "rtc_utils.h"
 
-V4l2MediaSource::V4l2MediaSource(std::shared_ptr<ThreadPool> pool) :
-    MediaSource(pool),
-    mPool(pool),
-    mWidth(FRAME_WIDTH),
-    mHeight(FRAME_HEIGHT)
+V4l2MediaSource::V4l2MediaSource(std::shared_ptr<ThreadPool> pool, V4l2MediaSourceParam &param) : MediaSource(pool) 
 {
-    setFps(FPS);
+    setFps(param.fps);
+    mHeight = param.height;
+    mWidth = param.width;
+    mDriverType = param.driverType;
+    mFmt = param.fmt;
 
     for (int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
         mFrameInputQueue.push(&mFrames[i]);
     }
+
+    mPool->createThreads();
+    mEncoder = std::make_unique<Encoder>();
 }
 
 V4l2MediaSource::~V4l2MediaSource()
 {
+    mPool->cancelThreads();
     videoExit();
 }
 
 int V4l2MediaSource::init(const std::string &dev)
 {
-    int ret = 0;
     auto iter = devFdMap.find(dev);
     if (iter != devFdMap.end()) {
-        mFd = iter->second;
-    } else {
-        ret = videoInit(dev);
-        devFdMap.insert(std::make_pair(dev, mFd));
+        setFd(iter->second);
+        mV4l2Buf = mFdV4l2BufMap[iter->second];
+        for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
+            mPool->addTask(mTask);
+        }
+
+        PLOGD << "reopen " << dev << " fd = " << iter->second << " mV4lfBuf = " << mV4l2Buf;
+        return 0;
     }
 
-    mPool->createThreads();
+    Utils::killProcessUsingDevice(dev);
+    int fd = -1;
+    int ret = videoInit(dev, fd);
+    if (ret != 0) {
+        return ret;
+    }
+
+    if (mEncoder->init(mWidth, mHeight, mWidth, mHeight) != 0) {
+        PLOGE << "encoder init failed";
+        return -1;
+    }
+
+    setFd(fd);
+    devFdMap.try_emplace(dev, fd);
+    mFdV4l2BufMap.try_emplace(fd, mV4l2Buf);
+    PLOGD << " open " << dev << " fd = " << fd << " mV4lfBuf = " << mV4l2Buf;
     for(int i = 0; i < DEFAULT_FRAME_NUM; ++i) {
         mPool->addTask(mTask);
     }
 
-    return ret;
+    return 0;
 }
 
 int V4l2MediaSource::deInit()
 {
-    mPool->cancelThreads();
-    // return videoExit();
+    setFd(-1);
     return 0;
 }
 
@@ -72,6 +94,22 @@ static inline int startCode4(uint8_t* buf)
     }
 }
 
+const std::string filePath = "./test.h264";
+
+#include <fstream>
+
+void dumpToFile(struct v4l2_buf* v4l2Buf, struct v4l2_buf_unit* bufUnit)
+{
+    std::ofstream file(filePath, std::ios::binary | std::ios::app);
+    if (!file.is_open()) {
+        PLOGE << "open file failed, errno = " << errno;
+        return;
+    }
+
+    file.write((char*)bufUnit->start[0], bufUnit->bytesused);
+    file.close();
+}
+
 void V4l2MediaSource::readFrame()
 {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -80,7 +118,11 @@ void V4l2MediaSource::readFrame()
         return;
     }
 
-    // PLOGD << "readFrame thread id: " << syscall(SYS_gettid);
+    if (mFd < 0) {
+        PLOGE << " fd < 0";
+        return;
+    }
+
     Frame* frame = mFrameInputQueue.front();
     for (auto i = 0; i < 1; ++i) {
         int ret = v4l2_poll(mFd);
@@ -95,93 +137,106 @@ void V4l2MediaSource::readFrame()
             return;
         }
 
-        parseH264(frame, (uint8_t*)mV4l2BufUnit->start, mV4l2BufUnit->length);
-        //不知道为什么，在t113 或者 x2600上这里需要占着cpu等一会，去掉后会出现 errno = 51 或者 53
-        ret = v4l2_qbuf(mFd, mV4l2BufUnit);
+        mEncoder->encoder((uint8_t*)mV4l2BufUnit->start[0], mV4l2BufUnit->bytesused, frame->mBufferArr, frame->mSizeArr);
+        ret = v4l2_qbuf(mFd, mV4l2BufUnit, mV4l2Buf);
         if (ret < 0) {
             PLOGE << " qbuf fail, errno = " << errno;
             return;
         }
     }
+
     mFrameInputQueue.pop();
     mFrameOutputQueue.push(frame);
 }
 
-int V4l2MediaSource::videoInit(const std::string &dev)
+int V4l2MediaSource::videoInit(const std::string &dev, int &fd)
 {
     int ret;
     char devName[100];
-    struct v4l2_capability cap;
+    struct v4l2_capability cap = { 0 };
 
-    mFd = v4l2_open(dev.c_str(), O_RDWR);
-    if(mFd < 0) {
+    fd = v4l2_open(dev.c_str(), O_RDWR | O_NONBLOCK);
+    if(fd < 0) {
         PLOGE << "v4l2_open " << dev << " failed, errno = " << errno;
         return -1;
     }
 
-    ret = v4l2_querycap(mFd, &cap);
+    ret = v4l2_querycap(fd, &cap);
     if(ret < 0) {
         PLOGE << "v4l2_querycap " << dev << " failed, errno = " << errno;
         return ret;
     }
 
-    if(!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-        PLOGE << " V4L2_CAP_VIDEO_CAPTURE not supported.";
+    if(!(cap.capabilities & mDriverType)) {
+        PLOGE << mDriverType << "  not supported.";
         return -1;
     }
 
-    ret = v4l2_enum_fmt(mFd, V4L2_PIX_FMT_H264, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-    if(ret < 0) {
-        PLOGE << " v4l2_enum_fmt V4L2_PIX_FMT_H264 failed, errno = " << errno;
-        return -1;
-    }
-
-    ret = v4l2_s_fmt(mFd, &mWidth, &mHeight, V4L2_PIX_FMT_H264, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-    if(ret < 0) {
-        PLOGE << " v4l2_s_fmt V4L2_PIX_FMT_H264 failed, errno = " << errno;
-        return -1;
-    }
-
-    struct v4l2_streamparm parm = { 0 };
-    parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    parm.parm.capture.timeperframe.numerator = 1;
-    parm.parm.capture.timeperframe.denominator = FPS;
-    ret = v4l2_s_parm(mFd, &parm);
+    ret = v4l2_s_input(fd, 0);
     if (ret < 0) {
-        PLOGE << " v4l2_s_parm V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        PLOGE << "v4l2_s_input " << dev << " failed, errno = " << errno;
         return ret;
     }
 
-    mV4l2Buf = v4l2_reqbufs(mFd, V4L2_BUF_TYPE_VIDEO_CAPTURE, 4);
+    enum v4l2_buf_type bufType = mDriverType == V4L2_CAP_VIDEO_CAPTURE ?
+        V4L2_BUF_TYPE_VIDEO_CAPTURE : V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    ret = v4l2_enum_fmt(fd, mFmt, bufType);
+    if(ret < 0) {
+        PLOGE << " v4l2_enum_fmt " << mFmt << " failed, errno = " << errno;
+        return -1;
+    }
+
+    int mPlanesNum = 0;
+    ret = v4l2_s_fmt(fd, mFmt, bufType, &mWidth, &mHeight, &mPlanesNum);
+    if(ret < 0) {
+        PLOGE << " v4l2_s_fmt " <<  mFmt << " failed, errno = " << errno;
+        return -1;
+    }
+
+    PLOGI << " bufType == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE : " << (bufType == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
+    struct v4l2_streamparm parm = { 0 };
+    parm.type = bufType;
+    parm.parm.capture.timeperframe.numerator = 1;
+    parm.parm.capture.timeperframe.denominator = mFps;
+    ret = v4l2_s_parm(fd, &parm);
+    if (ret < 0) {
+        PLOGE << " v4l2_s_parm " <<  mFmt << " failed, errno = " << errno;
+        return ret;
+    }
+
+    mV4l2Buf = v4l2_reqbufs(fd, bufType, 4);
     if(!mV4l2Buf) {
-        PLOGE << " v4l2_reqbufs V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        PLOGE << " v4l2_reqbufs " <<  mFmt << " failed, errno = " << errno;
         return -1;
     }
 
-    ret = v4l2_querybuf(mFd, mV4l2Buf);
+    mV4l2Buf->num_planes = mPlanesNum;
+    ret = v4l2_querybuf(fd, mV4l2Buf);
     if(ret < 0) {
-        PLOGE << " v4l2_querybuf V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        PLOGE << " v4l2_querybuf " <<  mFmt << " failed, errno = " << errno;
         return -1;
     }
 
-    ret = v4l2_mmap(mFd, mV4l2Buf);
+    ret = v4l2_mmap(fd, mV4l2Buf);
     if(ret < 0) {
-        PLOGE << " v4l2_mmap V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        PLOGE << " v4l2_mmap " <<  mFmt << " failed, errno = " << errno;
         return -1;
     }
 
-    ret = v4l2_qbuf_all(mFd, mV4l2Buf);
+    ret = v4l2_qbuf_all(fd, mV4l2Buf);
     if(ret < 0) {
-        PLOGE << " v4l2_qbuf_all V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        PLOGE << " v4l2_qbuf_all " <<  mFmt << " failed, errno = " << errno;
         return -1;
     }
 
-    ret = v4l2_streamon(mFd);
+    PLOGI << " v4l2_querybuf " <<  mFmt << " success";
+    ret = v4l2_streamon(fd, bufType);
     if(ret < 0) {
-        PLOGE << " v4l2_streamon V4L2_PIX_FMT_H264 failed, errno = " << errno;
+        PLOGE << " v4l2_streamon " << mFmt << " failed, errno = " << errno;
         return -1;
     }
 
+    PLOGI << " v4l2_streamon " <<  mFmt << " success";
     return 0;
 }
 
@@ -189,7 +244,9 @@ int V4l2MediaSource::videoExit()
 {
     int ret;
 
-    ret = v4l2_streamoff(mFd);
+    enum v4l2_buf_type bufType = mDriverType == V4L2_CAP_VIDEO_CAPTURE ?
+        V4L2_BUF_TYPE_VIDEO_CAPTURE : V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    ret = v4l2_streamoff(mFd, bufType);
     if (ret < 0) {
         PLOGE << "streamoff failed, errno = " << errno;
         return ret;
@@ -207,11 +264,15 @@ int V4l2MediaSource::videoExit()
         return ret;
     }
 
+    free(mV4l2Buf);
+    free(mV4l2Buf->buf);
     ret = v4l2_close(mFd);
     mFd = -1;
+
     return ret;
 }
 
+/* 将h264 数据解析为单个NALU单元， Webrtc 只支持传送NALU 单元 */
 void V4l2MediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
 {
     int i = 0;
@@ -238,7 +299,7 @@ void V4l2MediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
                     frame->mSizeArr.push_back(i - before - offset);
                     num++;
                 } else {
-                    std::cout << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num << std::endl;
+                    PLOGE << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num;
                 }
                 before = i;
             }
@@ -249,7 +310,7 @@ void V4l2MediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
                     frame->mSizeArr.push_back(i - before - offset);
                     num++;
                 } else if (num != 0){
-                    std::cout << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num << std::endl;
+                    PLOGE << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num;
                 }
                 before = i;
             }
@@ -262,6 +323,12 @@ void V4l2MediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
         frame->mSizeArr.push_back(i - before);
         num++;
     }  else if (num != 0){
-        std::cout << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num << std::endl;
+        PLOGE << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num;
     }
+}
+
+void V4l2MediaSource::setFd(int fd)
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+    mFd = fd;
 }

@@ -11,6 +11,9 @@ enum RTC_CMD {
     CMD_KLIPPY_Z,
     CMD_SHOW_DEVS,
     CMD_DISCONNECT,
+    CMD_CALIB_OFFSET_PRE,
+    CMD_CALIB_OFFSET_POST,
+    CMD_CALIB_RT,
     CMD_BUTT
 };
 
@@ -41,3 +44,17 @@ typedef struct {
     double y;
     double z;
 } RTC_Pos_Param;
+
+typedef struct {
+    int nozzleT;
+    int posX;
+    int posY;
+    int posZ;
+} RTC_CALIB_OFFSET_PARAM;
+
+typedef struct {
+    int cnt;
+    int posX;
+    int posY;
+    int posZ;
+} RTC_CALIB_RT_PARAM;

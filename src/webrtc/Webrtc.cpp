@@ -134,7 +134,7 @@ void Webrtc::createPeerConnection(std::weak_ptr<rtc::WebSocket> wclient, rtc::me
             pc->addRemoteCandidate(rtc::Candidate(sdp, mid));
         }
     } else {
-        PLOGI << "WebSocketServer: Received bytes message" << endl;
+        PLOGI << "WebSocketServer: Received bytes message";
     }
 }
 

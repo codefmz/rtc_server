@@ -7,7 +7,7 @@ toolchain_file=""
 
 print_usage() {
     echo "Usage: sh $(basename "$0") [-p <platform>] [-t <target>]"
-    echo "Supported platform : t113_i, pc"
+    echo "Supported platform : t113_i, t536, pc"
     echo "Supported target: , , , "
     echo "eg: sh $(basename "$0") -p t113_i -t gcode_param_ut"
 }
@@ -16,7 +16,10 @@ get_toolchain_file() {
     case "$1" in
         t113_i)
             echo "toolchains/t113_i.toolchain.cmake"
-            ;;    
+            ;;
+        t536)
+            echo "toolchains/t536.toolchain.cmake"
+            ;;
         pc)
             echo ""
             ;;
@@ -70,7 +73,7 @@ if [ "$platform" != "pc" ]; then
     echo "/opt/cxsw_sdk/${platform}/sysroot/"
 fi
 
-cmake -DCMAKE_TOOLCHAIN_FILE="./toolchain/${platform}.cmake" -S . -B build
+cmake -DCMAKE_TOOLCHAIN_FILE="./toolchain/${platform}.cmake" -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --target ${target} -- -j$(nproc)
 
 if [ "$platform" != "pc" ]; then

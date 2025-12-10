@@ -46,6 +46,13 @@ public:
     int processXyZero(void *input, void *output);
 
     int processZZero(void *input, void *output);
+
+    const std::string& getHomeAxes() const {
+        return homeAxes;
+    }
+
+    int sendCmd(const std::string &cmd, bool block);
+
 private:
     static void readCallBack(void *arg);
 
@@ -61,16 +68,18 @@ private:
 
     void parseJson(const Json::Value& json);
 
-    int sendCmd(std::string &cmd, bool block);
+    int parseRecvJson(const Json::Value& json);
 
 private:
     std::mutex mutex;
     std::condition_variable condition;
+    std::queue<Json::Value> recvQueue;
     int sock = -1;
     IOEvent* mIOEvent = nullptr;
     Poller* mPoller = nullptr;
     std::function<void(double, double, double)> posChangeCallback; 
     char buffer[BUFFER_SIZE];
+    std::string homeAxes;
 };
 
 #endif 

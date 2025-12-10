@@ -56,7 +56,7 @@ void H264RtpSink::handleFrame(Frame* frame)
                 *   |S|E|R|  Type   |
                 *   +---------------+
                 * */
-                rtpHeader->payload[1] = naluType & 0x1F;
+                rtpHeader->payload[1] = naluType & 0x1F; //naluType & 0x1F表示nalu的类型
 
                 if (i == 0) { //第一包数据
                     rtpHeader->payload[1] |= 0x80; // start
@@ -86,8 +86,6 @@ void H264RtpSink::handleFrame(Frame* frame)
         }
     }
     mTimestamp += mClockRate/mFps;
-
-    // PLOGD << "handleFrame frameSize = " << frameSize;
 }
 
 void H264RtpSink::start()

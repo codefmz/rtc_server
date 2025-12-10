@@ -4,16 +4,20 @@
 #include <linux/videodev2.h>
 #include <stdint.h>
 
+#define MAX_PLANES 3   // NV12=2，YUV420M=3，一般最大3即可
+
 struct v4l2_buf_unit {
-    int                index;
-    void*              start;
-    uint32_t           length;
-    uint32_t           offset;
+    uint32_t index;
+    uint32_t bytesused;                   // 本 plane 实际有效数据
+    void* start[MAX_PLANES];              // mmap 地址
+    uint32_t length[MAX_PLANES];          // mmap size  
+    uint32_t offset[MAX_PLANES];          // offset from QUERYBUF
 };
 
 struct v4l2_buf {
-    struct v4l2_buf_unit* buf;
-    int nr_bufs;
+    struct v4l2_buf_unit* buf;  // 数组
+    int nr_bufs;                // buffer 数量
+    int num_planes;
     enum v4l2_buf_type type;
 };
 
@@ -29,7 +33,7 @@ int v4l2_s_input(int fd, int index);
 
 int v4l2_enum_fmt(int fd, unsigned int fmt, enum v4l2_buf_type type);
 
-int v4l2_s_fmt(int fd, int* width, int* height, unsigned int fmt, enum v4l2_buf_type type);
+int v4l2_s_fmt(int fd, unsigned int fmt, enum v4l2_buf_type type, int* width, int* height, int *planesNum);
 
 struct v4l2_buf* v4l2_reqbufs(int fd, enum v4l2_buf_type type, int nr_bufs);
 
@@ -41,11 +45,11 @@ int v4l2_munmap(int fd, struct v4l2_buf* v4l2_buf);
 
 int v4l2_relbufs(int fd, struct v4l2_buf* v4l2_buf);
 
-int v4l2_streamon(int fd);
+int v4l2_streamon(int fd, enum v4l2_buf_type type);
 
-int v4l2_streamoff(int fd);
+int v4l2_streamoff(int fd, enum v4l2_buf_type type);
 
-int v4l2_qbuf(int fd, struct v4l2_buf_unit* buf);
+int v4l2_qbuf(int fd, struct v4l2_buf_unit* buf, struct v4l2_buf *v4l2Buf);
 
 int v4l2_qbuf_all(int fd, struct v4l2_buf* v4l2_buf);
 

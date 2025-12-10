@@ -1,0 +1,5 @@
+if (PLATFORM_NAME STREQUAL "t536")
+    add_subdirectory(t536)
+else()
+    add_subdirectory(pc)
+endif()

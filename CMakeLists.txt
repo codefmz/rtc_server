@@ -12,12 +12,22 @@ if (PLATFORM_NAME STREQUAL "pc")
     set_target_properties(jsoncpp PROPERTIES
         INTERFACE_LINK_LIBRARIES jsoncpp_lib
     )
+else()
+    set(ENV{PKG_CONFIG_PATH} "/opt/V2.0/cxsw_sdk/t536/sysroot/usr/lib/pkgconfig")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+
+    message("JSONCPP_INCLUDE_DIRS: ${JSONCPP_INCLUDE_DIRS}")
+    message("JSONCPP_LIBRARIES: ${JSONCPP_LIBRARIES}")
+    # set(jsoncpp ${JSONCPP_LIBRARIES})
+
 endif()
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/${PLATFORM_NAME}
     ${INCLUDE_DIR}
+    ${ALLWINNER_DIR}
 )
 
 link_directories(
@@ -25,10 +35,10 @@ link_directories(
     ${LIB_DIR}
 )
 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin/${PLATFORM_NAME})
 
 add_subdirectory(src)
 add_subdirectory(test)
 
 add_executable(rtc_server main.cpp)
-target_link_libraries(rtc_server webrtc ssl crypto dl v4l2 klipper) # ssl crypto dl 是 werbrtc 库libdatachannel依赖
+target_link_libraries(rtc_server webrtc ssl crypto dl v4l2 nozzlecalib) # ssl crypto dl 是 werbrtc 库libdatachannel依赖

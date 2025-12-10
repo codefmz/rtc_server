@@ -1,6 +1,6 @@
 #include "Klipper.h"
 #include "RtcPacket.h"
-#include "Poller.h"
+#include "plog/Log.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -11,8 +11,7 @@
 #include <unistd.h>
 
 #define SOCKET_SESSION_ID       1021 //订阅消息id
-#define SEND_SOCKET_ID          1022 //发送消息id
-#define SEND_SOCKET_ONE_WAY_ID  1023 //oneway消息的发送id
+#define SEND_SOCKET_ID          1023 //发送消息id
 #define SOCKET_END_CHAR         0x3
 #define WAIT_TIME_PER           1 /* 每次等待时长，秒*/
 
@@ -23,6 +22,7 @@ int Klipper::init(const char *socketPath, Poller *mPoller) {
  
     sock = socket(AF_UNIX, SOCK_STREAM, 0); 
     if (sock < 0) {
+        PLOGE << "Failed to create socket, errno = " << errno;
         return -1;
     }
 
@@ -30,6 +30,7 @@ int Klipper::init(const char *socketPath, Poller *mPoller) {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socketPath, sizeof(addr.sun_path) - 1);
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        PLOGE << "Failed to connect to socket, errno = " << errno;
         goto err;
     }
 
@@ -39,6 +40,7 @@ int Klipper::init(const char *socketPath, Poller *mPoller) {
     mPoller->addIOEvent(mIOEvent);
 
     if (queryStatus() < 0){ //订阅状态
+        PLOGE << "Failed to query status, errno = " << errno;
         goto err;
     }
 
@@ -58,10 +60,8 @@ int Klipper::processMove(void *input, void *output)
 
     std::string cmd = "G1 X" + std::to_string(x) + " Y" + std::to_string(y) + " Z" + std::to_string(z) + " F8000";
 
-    std::cout << " cmd: " << cmd << std::endl;
-
     if (sendCmd(cmd, true) != 0) {
-        std::cout << "send cmd error." << std::endl;
+        PLOGE << "Failed to send cmd, errno = " << errno << " cmd = " << cmd;
         return -1;
     }
 
@@ -77,7 +77,7 @@ int Klipper::processXyZero(void *input, void *output)
     std::string cmd = "G28 x y";
 
     if (sendCmd(cmd, true) != 0) {
-        std::cout << "send cmd error." << std::endl;
+        PLOGE << "send cmd error, cmd = " << cmd;
         return -1;
     }
 
@@ -93,7 +93,7 @@ int Klipper::processZZero(void *input, void *output)
     std::string cmd = "G28 z";
 
     if (sendCmd(cmd, true) != 0) {
-        std::cout << "send cmd error." << std::endl;
+        PLOGE << "send cmd error, cmd = " << cmd;
         return -1;
     }
 
@@ -115,14 +115,18 @@ void Klipper::handleRead()
     ssize_t len = recv(sock, buffer, BUFFER_SIZE - 1, 0);
     std::string message(buffer, len);
 
-    std::cout << "Klipper::readCallBack buffer = " << std::string(buffer, len) << std::endl;
+    PLOGI << "Klipper::readCallBack buffer = " << std::string(buffer, len);
 
     Json::Value response;
     if (!str2Json(message, response)) {
         return;
     }
 
-    parseJson(response);
+    if (response["id"].asInt() == SOCKET_SESSION_ID) {
+        parseJson(response);
+    } else if (response["id"].asInt() == SEND_SOCKET_ID) { 
+        recvQueue.push(response);
+    }
 }
 
 void Klipper::disconnect() {
@@ -141,6 +145,7 @@ int Klipper::queryStatus() {
         "params": {
             "objects": {
                 "toolhead": ["position"]
+                "toolhead": ["homed_axes"]
             },
             "response_template": {}
         }
@@ -200,23 +205,63 @@ void Klipper::parseJson(const Json::Value &json)
     if (posChangeCallback) {
         posChangeCallback(x, y, z);
     }
+
+    if (!json["params"]["status"]["toolhead"].isMember("homed_axes")) {
+        return;
+    }
+
+    homeAxes = json["params"]["status"]["toolhead"]["homed_axes"].asString();
 }
 
-int Klipper::sendCmd(std::string &cmd, bool block)
+int Klipper::parseRecvJson(const Json::Value &json)
+{
+    if (json.isMember("result") && json["result"].asString() == "ok") {
+        return 0;
+    }
+
+    return -1;
+}
+
+int Klipper::sendCmd(const std::string &cmd, bool block)
 {
     static std::string temp = R"({
         "id": 1023, 
         "method": "gcode/script",
         "params": {"script": ")";
 
+    std::string gcode = cmd;
     if (block) {
-        cmd.append(" M400\"}}");
+        gcode.append(" M400\"}}");
     } else {
-        cmd.append("\"}}");
+        gcode.append("\"}}");
     }
 
-    std::string gcode = temp + cmd;
-    return sendGCode(gcode);
+    gcode = temp + gcode;
+
+    PLOGI << "Klipper::sendCmd gcode = " << gcode;
+    int ret = sendGCode(gcode);
+    if (ret != 0) {
+        PLOGE << "Failed to send gcode, errno = " << errno << " gcode = " << gcode;
+        return -1;
+    }
+
+    if (block) {
+        std::unique_lock<std::mutex> lock(mutex);
+        condition.wait_for(lock, std::chrono::seconds(RECEIVE_TIMEOUT), [this] { 
+            return !recvQueue.empty();
+        });
+
+        if (recvQueue.empty()) {
+            PLOGE << "Failed to receive response, timeout";
+            return -1;
+        }
+        
+        Json::Value& json = recvQueue.front();
+        ret = parseRecvJson(json);
+        recvQueue.pop();
+    }
+
+    return ret;
 }
 
 
