@@ -48,7 +48,7 @@ private:
 
 protected:
     std::shared_ptr<ThreadPool> mPool;
-        // TODO : 可以使用无锁环形队列优化
+    // TODO : 可以使用无锁环形队列优化
     Frame mFrames[DEFAULT_FRAME_NUM];
     std::queue<Frame*> mFrameInputQueue;
     std::queue<Frame*> mFrameOutputQueue;

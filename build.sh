@@ -3,30 +3,13 @@ echo "TOP_DIR=$TOP_DIR"
 
 platform=""
 target=""
-toolchain_file=""
+debug=""
 
 print_usage() {
-    echo "Usage: sh $(basename "$0") [-p <platform>] [-t <target>]"
-    echo "Supported platform : t113_i, t536, pc"
-    echo "Supported target: , , , "
-    echo "eg: sh $(basename "$0") -p t113_i -t gcode_param_ut"
-}
-
-get_toolchain_file() {
-    case "$1" in
-        t113_i)
-            echo "toolchains/t113_i.toolchain.cmake"
-            ;;
-        t536)
-            echo "toolchains/t536.toolchain.cmake"
-            ;;
-        pc)
-            echo ""
-            ;;
-        *)
-            echo ""
-            ;;
-    esac
+    echo "Usage: sh $(basename "$0") [-p <platform>] [-t <target>] [-d <debug>]"
+    echo "Supported platform : win, linux"
+    echo "Supported target: "
+    echo "eg: sh $(basename "$0") -p -t "
 }
 
 # 解析命令行参数
@@ -42,16 +25,14 @@ while true; do
     case "$1" in
         -p)
             platform="$2"
-            toolchain_file=$(get_toolchain_file "$platform")
-            if [ -z "$toolchain_file" ] && [ "$platform" != "pc" ]; then
-                echo "Error: Unsupported chip name '$platform'."
-                print_usage
-                exit 1
-            fi
             shift 2
             ;;
         -t)
             target="$2"
+            shift 2
+            ;;
+        -d)
+            debug="$2"
             shift 2
             ;;
         --)
@@ -66,17 +47,15 @@ while true; do
     esac
 done
 
+cmake_params=""
+if [ "$debug" == "y" ]; then
+    cmake_params="-DCMAKE_BUILD_TYPE=Debug"
+else
+    cmake_params="-DCMAKE_BUILD_TYPE=Release"
+fi
+
+
 echo "compile target = ${target}, platform = ${platform}"
 
-if [ "$platform" != "pc" ]; then
-    export STAGING_DIR="/opt/cxsw_sdk/${platform}/sysroot/"
-    echo "/opt/cxsw_sdk/${platform}/sysroot/"
-fi
-
-cmake -DCMAKE_TOOLCHAIN_FILE="./toolchain/${platform}.cmake" -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build $cmake_params
 cmake --build build --target ${target} -- -j$(nproc)
-
-if [ "$platform" != "pc" ]; then
-    unset STAGING_DIR
-    echo "unsetenv=>STAGING_DIR: $STAGING_DIR"
-fi

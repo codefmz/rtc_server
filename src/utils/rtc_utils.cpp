@@ -1,7 +1,10 @@
 #include "rtc_utils.h"
 #include "plog/Log.h"
 #include "Base.h"
+#include "PlatformCompat.h"
+#include <array>
 #include <memory>
+#include <dirent.h>
 
 bool Utils::popenCmd(const std::string &cmd, std::string &output)
 {
@@ -28,38 +31,18 @@ bool Utils::popenCmd(const std::string &cmd, std::string &output)
     return true;
 }
 
-int Utils::setLight(const std::string &devName, int lightSet)
-{
-    std::string cmd = "cam_util -i " + devName + " -s " + std::to_string(lightSet);
-    std::string str;
-    if (!Utils::popenCmd(cmd, str)) {
-        PLOGE << "setLight failed.";
-        return -1;
-    }
-
-    if (str.find("set irlight ok") == std::string::npos) {
-        return -1;
-    }
-
-    return 0;
-}
-
 int Utils::killProcessUsingDevice(const std::string &devName)
 {
     std::string cmd = "fuser -k " + devName;
-    return  system(cmd.c_str());
+    return system(cmd.c_str());
 }
 
-int Utils::parseH264(uint8_t *h264Data, int length, int offset, std::vector<std::vector<uint8_t>> &bufferArr, std::vector<int> &sizeArr, int &num)
+int Utils::parseH264(uint8_t *h264Data, int length, int offset,
+    std::vector<std::vector<uint8_t>> &bufferArr, std::vector<int> &sizeArr, int &num)
 {
     int i = 0;
     int before = 0;
 
-    /* startcode : 0 - 3,  SSP : 4 - 14,  startcode : 15 - 18, PSS : 19 - 22， startcode : 23 - 26, 剩余 */
-    /*  00000000  00 00 00 01 67 4d 00 1f  89 89 40 3c 01 12 20 00  |....gM....@<.. .|
-        00000010  00 00 01 68 ee 3c 80 00  00 00 01 65 88 80 04 00  |...h.<.....e....|
-        00000020  00 97 4f 06 3e d0 85 fd  67 ff 73 35 6d 1f eb c3  |..O.>...g.s5m...|
-    */
     while (i + offset <= length) {
         if (h264Data[i] != 0) {
             i++;
@@ -90,7 +73,7 @@ int Utils::parseH264(uint8_t *h264Data, int length, int offset, std::vector<std:
             if (i != 0) {
                 PLOGE << "h264Data error, length = " << length << " len = "  << len << " num = " << num;
             }
-     
+
         }
 
         before = i;
@@ -107,4 +90,66 @@ int Utils::parseH264(uint8_t *h264Data, int length, int offset, std::vector<std:
     }
 
     return 0;
+}
+
+std::string Utils::getCameraDevName(const std::string &camName)
+{
+    DIR* dir = opendir("/sys/class/video4linux/");
+    if (!dir) {
+        return "";
+    }
+
+    std::array<std::string, 2> devNames;
+    int count = 0;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string path = "/sys/class/video4linux/" + std::string(entry->d_name) + "/name";
+        std::ifstream ifs(path);
+        std::string device_name;
+        if (ifs && std::getline(ifs, device_name)) {
+            if (device_name.find(camName) != std::string::npos) {
+                devNames[count++] = std::string(entry->d_name);
+                if (count == 2) {
+                    break;
+                }
+            }
+        }
+    }
+
+    closedir(dir);
+    if (devNames[0] > devNames[1]) { //readdir 涓嶆槸鎸夌収椤哄簭璇诲彇鐨? usb浼氬姞杞戒袱涓紝鍙湁搴忓彿杈冨皬鐨勯偅涓彲浠ョ敤
+        devNames[0] = devNames[1];
+    }
+
+    return "/dev/" + devNames[0];
+}
+
+void Utils::getVideoDevs(std::vector<std::string> &devs)
+{
+    FILE *fp = popen("ls /dev/video* 2>/dev/null", "r");
+    char buf[1024] = { 0 };
+    while (fgets(buf, 1024, fp)) {
+        buf[strlen(buf) - 1] = '\0';
+        devs.push_back(std::string(buf));
+    }
+
+    pclose(fp);
+}
+
+int Utils::startCode3(uint8_t * buf)
+{
+    if (buf[0] == 0 && buf[1] == 0 && buf[2] == 1) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int Utils::startCode4(uint8_t * buf)
+{
+    if (buf[0] == 0 && buf[1] == 0 && buf[2] == 0 && buf[3] == 1) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
