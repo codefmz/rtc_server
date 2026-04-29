@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "default",
+      "inherits": "vcpkg",
+      "environment": {
+        "VCPKG_ROOT": "E:\\3rd\\vcpkg",
+        "RC": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe",
+        "PATH": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64;$penv{PATH}",
+        "VCPKG_KEEP_ENV_VARS": "RC;PATH;INCLUDE;LIB"
+      }
+    }
+  ]
+}

@@ -27,23 +27,20 @@ void testTask(void* arg)
 {
     int *i = (int*)arg;
     ++(*i);
-    pthread_t tid = pthread_self();
-    PLOGD << "pthread_self id: " << tid;
-    PLOGD << " gettid = " << gettid();
+    auto tid = std::this_thread::get_id();
+    PLOGD << "this_thread id: " << tid;
 }
 
 TEST_F(threadpool, testThreadPoolStartEnd)
 {
-    std::shared_ptr<ThreadPool> pool = std::make_shared<ThreadPool>(1);
+    std::shared_ptr<ThreadPool> pool = std::make_shared<ThreadPool>(10);
 
     int num = 0;
     Task task;
     task.setTaskCallback(testTask, &num);
 
-    for (int i = 0; i < 100; i++) {
-        pool->createThreads();
+    for (int i = 0; i < 1000; i++) {
         pool->addTask(task);
-        pool->cancelThreads();
     }
 
     PLOGD << "num: " << num;

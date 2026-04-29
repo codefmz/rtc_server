@@ -153,3 +153,15 @@ int Utils::startCode4(uint8_t * buf)
         return 0;
     }
 }
+
+void Utils::dumpToFile(const std::string &filePath, uint8_t *data, int length)
+{
+    std::ofstream file(filePath, std::ios::binary | std::ios::app);
+    if (!file.is_open()) {
+        PLOGE << "open file failed, errno = " << errno;
+        return;
+    }
+
+    file.write(reinterpret_cast<char*>(data), length);
+    file.close();
+}

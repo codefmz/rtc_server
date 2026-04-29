@@ -22,17 +22,7 @@ int startCode3(uint8_t* buf);
 
 int startCode4(uint8_t* buf);
 
-void dumpToFile(struct v4l2_buf* v4l2Buf, struct v4l2_buf_unit* bufUnit)
-{
-    std::ofstream file(filePath, std::ios::binary | std::ios::app);
-    if (!file.is_open()) {
-        PLOGE << "open file failed, errno = " << errno;
-        return;
-    }
-
-    file.write((char*)bufUnit->start[0], bufUnit->bytesused);
-    file.close();
-}
+void dumpToFile(const std::string &filePath, uint8_t *data, int length);
 
 };
 

@@ -58,4 +58,4 @@ fi
 echo "compile target = ${target}, platform = ${platform}"
 
 cmake -S . -B build $cmake_params
-cmake --build build --target ${target} -- -j$(nproc)
+cmake --build build -- -j$(nproc)

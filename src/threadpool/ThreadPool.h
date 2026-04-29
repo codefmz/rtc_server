@@ -2,13 +2,10 @@
 #define _THREADPOOL_H_
 #include <queue>
 #include <vector>
-
 #include <atomic>
-#include "Thread.h"
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-
 
 class Task
 {
@@ -49,11 +46,6 @@ public:
     void createThreads();
     void cancelThreads();
 
-    class MThread : public Thread
-    {
-    protected:
-        virtual void run(void *arg);
-    };
 private:
     void handleTask();
 
@@ -62,7 +54,7 @@ private:
     std::queue<Task> mTaskQueue;
     std::mutex mMutex;
     std::condition_variable mCondition;
-    std::vector<MThread> mThreads;
+    std::vector<std::thread> mThreads;
     std::atomic<bool> mQuit;
 };
 

@@ -12,113 +12,17 @@ WinCapMediaSource::WinCapMediaSource(std::shared_ptr<ThreadPool> pool) : MediaSo
         mFrameInputQueue.push(&mFrames[i]);
     }
 
-    mPool->createThreads();
-
-    /* 初始化 WinRT apartment。Windows.Graphics.Capture 是 WinRT API，使用前需要先完成 apartment 初始化 */
-    winrt::init_apartment();
-
-    /* 创建 D3D11 设备 和上下文 */
-    /* Windows.Graphics.Capture 产出的帧最终会通过 Direct3D 纹理传递，因此整个捕获、保存、未来编码流程都围绕同一个 D3D11 device 进行 */
-    D3D11CreateDevice(
-        nullptr,                    // 使用默认显卡适配器
-        D3D_DRIVER_TYPE_HARDWARE,   // 使用硬件 D3D11 驱动
-        nullptr,
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
-        nullptr,
-        0,
-        D3D11_SDK_VERSION,
-        mD3dDevice.put(),          // 输出 ID3D11Device
-        nullptr,
-        mContext.put()             // 输出 immediate context
-    );
-
-    /* 选择主显示器作为捕获目标， */
-    mMonitor = MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
-
-    auto interop_factory = winrt::get_activation_factory<winrt::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
-    winrt::check_hresult(interop_factory->CreateForMonitor(mMonitor, winrt::guid_of<winrt::GraphicsCaptureItem>(), winrt::put_abi(mItem)));
-    auto size = mItem.Size();
-    std::cout << "Capture size: " << size.Width << "x" << size.Height << std::endl;
-
-    /* Windows.Graphics.Capture 需要WinRT 的IDirect3DDevice, 这里先从D3D11 device查询 IDXGIDevice，
-    再通过 interop helper 包装成WinRT 可识别的 Direct3D device */
-    winrt::com_ptr<IDXGIDevice> dxgiDevice;
-    winrt::check_hresult(g_d3dDevice->QueryInterface(__uuidof(IDXGIDevice), dxgiDevice.put_void()));
-    mDevice = CreateDirect3DDevice(dxgiDevice.get());
-
-    // 创建帧池和捕获会话。
-    /* CreateFreeThreaded 表示 FrameArrived 回调不依赖当前线程的 dispatcher，
-    适合控制台测试程序。第二个参数指定帧格式为 32-bit BGRA，第三个参数 2
-    表示帧池最多缓存 2 帧，避免回调处理稍慢时立即丢帧 */
-    auto framePool = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(mDevice,
-        winrt::DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, size);
-    auto session = framePool.CreateCaptureSession(mItem);
-
-    constexpr UINT32 fps = 30;
-    UINT32 encodedWidth = static_cast<UINT32>(size.Width) & ~1U;
-    UINT32 encodedHeight = static_cast<UINT32>(size.Height) & ~1U;
-
-    auto dxgiDeviceManager = CreateDxgiDeviceManager(mD3dDevice.get());
-    auto gpuConverter = CreateGpuVideoProcessor(mDevice.get(), mContext.get(), encodedWidth, encodedHeight);
-    winrt::com_ptr<IMFTransform> transform;
-    auto isSupportDxgiInput = CreateRawH264Encoder(encodedWidth, encodedHeight, fps, dxgiDeviceManager.get(), transform);
-    std::mutex encoderMutex;
-    UINT64 frameIndex = 0;
-
-    /* 每当系统捕获到新帧时触发。这里用 D3D11 VideoProcessor 在 GPU 上把 BGRA
-        捕获帧转成 NV12，再把 NV12 DXGI surface 直接交给 H.264 Encoder MFT。*/
-    framePool.FrameArrived([&](auto& sender, auto&) {
-        // TryGetNextFrame 取出帧池中的下一帧；frame 持有捕获表面和时间戳等信息。
-        auto frame = sender.TryGetNextFrame();
-        auto surface = frame.Surface();
-
-        // WinRT surface 本质上包着 DXGI/D3D 资源，这里取回底层 ID3D11Texture2D，
-        // 方便使用 D3D11 API 复制、读取或交给编码器。
-        auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surface);
-
-        std::lock_guard lock(encoderMutex);
-        ID3D11Texture2D* nv12Texture = ConvertBgraToNv12Gpu(gpuConverter, tex.get());
-        if (encoder.supportsDxgiInput) {
-            WriteNv12TextureToRawH264(encoder.transform.get(), nv12Texture, frameIndex++, fps);
-        } else {
-            // WriteNv12TextureToRawH264ByReadback(
-            //     encoder.transform.get(),
-            //     h264File,
-            //     g_d3dDevice.get(),
-            //     g_context.get(),
-            //     nv12Texture,
-            //     encodedWidth,
-            //     encodedHeight,
-            //     frameIndex++,
-            //     fps);
-        }
-    });
-
-    // 开始捕获。之后 FrameArrived 会在后台线程中持续触发，直到用户按 Enter。
-    session.StartCapture();
-    std::wcout << L"Capturing raw H.264 to " << filename << L"... Press Enter to stop\n";
-    std::cin.get();
-
-    // 显式关闭会话和帧池，释放系统捕获资源和 D3D 纹理缓存。
-    session.Close();
-    framePool.Close();
-
-    {
-        std::lock_guard lock(encoderMutex);
-        DrainRawH264Encoder(encoder.transform.get(), h264File);
-        fclose(h264File);
-        h264File = nullptr;
-    }
-
-    // 与 MFStartup 成对调用，释放 Media Foundation 全局资源。
-    MFShutdown();
-
 }
 
 WinCapMediaSource::~WinCapMediaSource()
 {
     mPool->cancelThreads();
     videoExit();
+}
+
+void WinCapMediaSource::startCapture()
+{
+    mSession.StartCapture();
 }
 
 winrt::com_ptr<IMFDXGIDeviceManager> WinCapMediaSource::CreateDxgiDeviceManager(ID3D11Device* device)
@@ -259,22 +163,22 @@ void WinCapMediaSource::WriteNv12TextureToRawH264(IMFTransform* encoder, ID3D11T
     ProcessH264Output(encoder);
 }
 
-// void WriteSampleBytesToFile(IMFSample* sample, FILE* file)
-// {
-//     winrt::com_ptr<IMFMediaBuffer> buffer;
-//     CheckHr(sample->ConvertToContiguousBuffer(buffer.put()), "IMFSample::ConvertToContiguousBuffer");
+void WriteSampleBytesToFile(IMFSample* sample)
+{
+    winrt::com_ptr<IMFMediaBuffer> buffer;
+    CheckHr(sample->ConvertToContiguousBuffer(buffer.put()), "IMFSample::ConvertToContiguousBuffer");
 
-//     BYTE* data = nullptr;
-//     DWORD maxLength = 0;
-//     DWORD currentLength = 0;
-//     CheckHr(buffer->Lock(&data, &maxLength, &currentLength), "IMFMediaBuffer::Lock(output)");
+    BYTE* data = nullptr;
+    DWORD maxLength = 0;
+    DWORD currentLength = 0;
+    CheckHr(buffer->Lock(&data, &maxLength, &currentLength), "IMFMediaBuffer::Lock(output)");
 
-//     if (currentLength > 0) {
-//         fwrite(data, 1, currentLength, file);
-//     }
+    if (currentLength > 0) {
+        Utils::dumpToFile("test.264", data, currentLength);
+    }
 
-//     CheckHr(buffer->Unlock(), "IMFMediaBuffer::Unlock(output)");
-// }
+    CheckHr(buffer->Unlock(), "IMFMediaBuffer::Unlock(output)");
+}
 
 void WinCapMediaSource::ProcessH264Output(IMFTransform* encoder)
 {
@@ -315,21 +219,13 @@ void WinCapMediaSource::ProcessH264Output(IMFTransform* encoder)
         CheckHr(hr, "IMFTransform::ProcessOutput");
 
         if (output.pSample != nullptr) {
-            WriteSampleBytesToFile(output.pSample, file);
+            WriteSampleBytesToFile(output.pSample);
         }
     }
 }
 
-void WriteTextureToRawH264(
-    IMFTransform* encoder,
-    FILE* file,
-    ID3D11Device* device,
-    ID3D11DeviceContext* context,
-    ID3D11Texture2D* srcTexture,
-    UINT32 width,
-    UINT32 height,
-    UINT64 frameIndex,
-    UINT32 fps)
+void WriteTextureToRawH264(IMFTransform* encoder, ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* srcTexture,
+    UINT32 width, UINT32 height, UINT64 frameIndex, UINT32 fps)
 {
     D3D11_TEXTURE2D_DESC desc{};
     srcTexture->GetDesc(&desc);
@@ -361,7 +257,6 @@ void WriteTextureToRawH264(
     CheckHr(buffer->SetCurrentLength(bufferSize), "IMFMediaBuffer::SetCurrentLength(NV12)");
 
     context->Unmap(staging.get(), 0);
-
     winrt::com_ptr<IMFSample> sample;
     CheckHr(MFCreateSample(sample.put()), "MFCreateSample(input)");
     CheckHr(sample->AddBuffer(buffer.get()), "IMFSample::AddBuffer(input)");
@@ -380,15 +275,144 @@ void WriteTextureToRawH264(
     ProcessH264Output(encoder, file);
 }
 
-int WinCapMediaSource::init(const std::string &dev)
+int WinCapMediaSource::videoInit()
 {
+ /* 初始化 WinRT apartment。Windows.Graphics.Capture 是 WinRT API，使用前需要先完成 apartment 初始化 */
+    winrt::init_apartment();
 
+    /* 创建 D3D11 设备 和上下文 */
+    /* Windows.Graphics.Capture 产出的帧最终会通过 Direct3D 纹理传递，因此整个捕获、保存、未来编码流程都围绕同一个 D3D11 device 进行 */
+    D3D11CreateDevice(
+        nullptr,                    // 使用默认显卡适配器
+        D3D_DRIVER_TYPE_HARDWARE,   // 使用硬件 D3D11 驱动
+        nullptr,
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
+        nullptr,
+        0,
+        D3D11_SDK_VERSION,
+        mD3dDevice.put(),          // 输出 ID3D11Device
+        nullptr,
+        mContext.put()             // 输出 immediate context
+    );
+
+    /* 选择主显示器作为捕获目标， */
+    mMonitor = MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
+
+    auto interop_factory = winrt::get_activation_factory<winrt::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
+    winrt::check_hresult(interop_factory->CreateForMonitor(mMonitor, winrt::guid_of<winrt::GraphicsCaptureItem>(), winrt::put_abi(mItem)));
+    auto size = mItem.Size();
+    std::cout << "Capture size: " << size.Width << "x" << size.Height << std::endl;
+
+    /* Windows.Graphics.Capture 需要WinRT 的IDirect3DDevice, 这里先从D3D11 device查询 IDXGIDevice，
+    再通过 interop helper 包装成WinRT 可识别的 Direct3D device */
+    winrt::com_ptr<IDXGIDevice> dxgiDevice;
+    winrt::check_hresult(g_d3dDevice->QueryInterface(__uuidof(IDXGIDevice), dxgiDevice.put_void()));
+    mDevice = CreateDirect3DDevice(dxgiDevice.get());
+
+    // 创建帧池和捕获会话。
+    /* CreateFreeThreaded 表示 FrameArrived 回调不依赖当前线程的 dispatcher，
+    适合控制台测试程序。第二个参数指定帧格式为 32-bit BGRA，第三个参数 2
+    表示帧池最多缓存 2 帧，避免回调处理稍慢时立即丢帧 */
+    mFramePool = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(mDevice,
+        winrt::DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, size);
+    mSession = mFramePool.CreateCaptureSession(mItem);
+
+    constexpr UINT32 fps = 30;
+    UINT32 encodedWidth = static_cast<UINT32>(size.Width) & ~1U;
+    UINT32 encodedHeight = static_cast<UINT32>(size.Height) & ~1U;
+
+    auto dxgiDeviceManager = CreateDxgiDeviceManager(mD3dDevice.get());
+    auto gpuConverter = CreateGpuVideoProcessor(mDevice.get(), mContext.get(), encodedWidth, encodedHeight);
+    auto isSupportDxgiInput = CreateRawH264Encoder(encodedWidth, encodedHeight, fps, dxgiDeviceManager.get(), mTransform);
+    UINT64 frameIndex = 0;
+
+    /* 每当系统捕获到新帧时触发。这里用 D3D11 VideoProcessor 在 GPU 上把 BGRA
+        捕获帧转成 NV12，再把 NV12 DXGI surface 直接交给 H.264 Encoder MFT。*/
+    mFramePool.FrameArrived([&](auto& sender, auto&) {
+        // TryGetNextFrame 取出帧池中的下一帧；frame 持有捕获表面和时间戳等信息。
+        auto frame = sender.TryGetNextFrame();
+        auto surface = frame.Surface();
+
+        // WinRT surface 本质上包着 DXGI/D3D 资源，这里取回底层 ID3D11Texture2D，
+        // 方便使用 D3D11 API 复制、读取或交给编码器。
+        auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surface);
+
+        std::lock_guard lock(mEncoderMutex);
+        ID3D11Texture2D* nv12Texture = ConvertBgraToNv12Gpu(gpuConverter, tex.get());
+        if (mTransform.supportsDxgiInput) {
+            WriteNv12TextureToRawH264(mTransform.get(), nv12Texture, frameIndex++, fps);
+        } else {
+            WriteNv12TextureToRawH264ByReadback(mTransform.get(),
+                mD3dDevice.get(), mContext.get(), nv12Texture, encodedWidth,
+                encodedHeight, frameIndex++, fps);
+        }
+    });
 }
 
-int WinCapMediaSource::deInit()
+void WinCapMediaSource::WriteNv12TextureToRawH264ByReadback(IMFTransform* encoder,
+    ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* nv12Texture,
+    UINT32 width, UINT32 height, UINT64 frameIndex, UINT32 fps)
 {
-    setFd(-1);
-    return 0;
+    D3D11_TEXTURE2D_DESC desc{};
+    nv12Texture->GetDesc(&desc);
+
+    D3D11_TEXTURE2D_DESC stagingDesc = desc;
+    stagingDesc.Usage = D3D11_USAGE_STAGING;
+    stagingDesc.BindFlags = 0;
+    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    stagingDesc.MiscFlags = 0;
+
+    winrt::com_ptr<ID3D11Texture2D> staging;
+    CheckHr(device->CreateTexture2D(&stagingDesc, nullptr, staging.put()), "ID3D11Device::CreateTexture2D(NV12 staging)");
+
+    context->CopyResource(staging.get(), nv12Texture);
+
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    CheckHr(context->Map(staging.get(), 0, D3D11_MAP_READ, 0, &mapped), "ID3D11DeviceContext::Map(NV12 staging)");
+
+    DWORD ySize = width * height;
+    DWORD uvSize = width * height / 2;
+    DWORD bufferSize = ySize + uvSize;
+
+    winrt::com_ptr<IMFMediaBuffer> buffer;
+    CheckHr(MFCreateMemoryBuffer(bufferSize, buffer.put()), "MFCreateMemoryBuffer(NV12 readback)");
+
+    BYTE* destination = nullptr;
+    DWORD maxLength = 0;
+    DWORD currentLength = 0;
+    CheckHr(buffer->Lock(&destination, &maxLength, &currentLength), "IMFMediaBuffer::Lock(NV12 readback)");
+
+    BYTE* source = reinterpret_cast<BYTE*>(mapped.pData);
+    for (UINT32 y = 0; y < height; ++y) {
+        memcpy(destination + y * width, source + y * mapped.RowPitch, width);
+    }
+
+    BYTE* destinationUv = destination + ySize;
+    BYTE* sourceUv = source + mapped.RowPitch * height;
+    for (UINT32 y = 0; y < height / 2; ++y) {
+        memcpy(destinationUv + y * width, sourceUv + y * mapped.RowPitch, width);
+    }
+
+    CheckHr(buffer->Unlock(), "IMFMediaBuffer::Unlock(NV12 readback)");
+    CheckHr(buffer->SetCurrentLength(bufferSize), "IMFMediaBuffer::SetCurrentLength(NV12 readback)");
+    context->Unmap(staging.get(), 0);
+
+    winrt::com_ptr<IMFSample> sample;
+    CheckHr(MFCreateSample(sample.put()), "MFCreateSample(NV12 readback input)");
+    CheckHr(sample->AddBuffer(buffer.get()), "IMFSample::AddBuffer(NV12 readback input)");
+
+    LONGLONG sampleDuration = 10'000'000LL / fps;
+    CheckHr(sample->SetSampleTime(frameIndex * sampleDuration), "IMFSample::SetSampleTime(NV12 readback input)");
+    CheckHr(sample->SetSampleDuration(sampleDuration), "IMFSample::SetSampleDuration(NV12 readback input)");
+
+    HRESULT hr = encoder->ProcessInput(0, sample.get(), 0);
+    if (hr == MF_E_NOTACCEPTING) {
+        ProcessH264Output(encoder, file);
+        hr = encoder->ProcessInput(0, sample.get(), 0);
+    }
+    CheckHr(hr, "IMFTransform::ProcessInput(NV12 readback)");
+
+    ProcessH264Output(encoder);
 }
 
 // void WinCapMediaSource::readFrame()
@@ -408,16 +432,25 @@ int WinCapMediaSource::deInit()
 //     mFrameOutputQueue.push(frame);
 // }
 
-int WinCapMediaSource::videoInit(const std::string &dev, int &fd)
-{
-
-}
-
 int WinCapMediaSource::videoExit()
 {
-    int ret;
+    // 显式关闭会话和帧池，释放系统捕获资源和 D3D 纹理缓存。
+    mSession.Close();
+    mFramePool.Close();
 
-    return ret;
+    {
+        std::lock_guard lock(mEncoderMutex);
+        CheckHr(mTransform->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0), "IMFTransform::ProcessMessage(COMMAND_DRAIN)");
+        ProcessH264Output(mTransform);
+        CheckHr(mTransform->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0), "IMFTransform::ProcessMessage(NOTIFY_END_OF_STREAM)");
+        CheckHr(mTransform->ProcessMessage(MFT_MESSAGE_NOTIFY_END_STREAMING, 0), "IMFTransform::ProcessMessage(NOTIFY_END_STREAMING)");
+        DrainRawH264Encoder(mTransform.get());
+    }
+
+    // 与 MFStartup 成对调用，释放 Media Foundation 全局资源。
+    MFShutdown();
+
+    return 0;
 }
 
 /* 将h264 数据解析为单个NALU单元， Webrtc 只支持传送NALU 单元 */
@@ -473,10 +506,4 @@ void WinCapMediaSource::parseH264(Frame* frame, uint8_t *h264Data, int length)
     }  else if (num != 0){
         PLOGE << "h264Data error, length = " << length << " i - before - offset = "  << i - before - offset << " num = " << num;
     }
-}
-
-void WinCapMediaSource::setFd(int fd)
-{
-    std::lock_guard<std::mutex> lock(mMutex);
-    mFd = fd;
 }

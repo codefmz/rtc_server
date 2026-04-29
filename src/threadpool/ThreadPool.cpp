@@ -2,6 +2,7 @@
 
 ThreadPool::ThreadPool(int num) : mNum(num)
 {
+    createThreads();
 }
 
 ThreadPool::~ThreadPool()
@@ -13,7 +14,7 @@ void ThreadPool::addTask(Task& task)
 {
     std::lock_guard<std::mutex>lock(mMutex);
     mTaskQueue.push(task);
-    mCondition.notify_all();
+    mCondition.notify_one();
 }
 
 void ThreadPool::handleTask()
@@ -44,9 +45,8 @@ void ThreadPool::handleTask()
 void ThreadPool::createThreads()
 {
     mQuit = false;
-    mThreads = std::vector<MThread>(mNum);
-    for(std::vector<MThread>::iterator it = mThreads.begin(); it != mThreads.end(); ++it) {
-        (*it).start(this);
+    for (int i = 0; i < mNum; i++) {
+        mThreads.emplace_back(std::thread(&ThreadPool::handleTask, this));
     }
 }
 
@@ -54,21 +54,15 @@ void ThreadPool::cancelThreads()
 {
     while (true) {
         std::lock_guard<std::mutex>lock(mMutex);
-        if (mTaskQueue.empty()) {
+        if (mTaskQueue.empty()) { // 先等待线程执行完所有的任务，任务队列为空
             mQuit = true;
             mCondition.notify_all();
             break;
         }
     }
 
-    for(std::vector<MThread>::iterator it = mThreads.begin(); it != mThreads.end(); ++it) {
-        (*it).join();
+    for (std::thread& thread : mThreads) {
+        thread.join();
     }
     mThreads.clear();
-}
-
-void ThreadPool::MThread::run(void* arg)
-{
-    ThreadPool* threadPool = (ThreadPool*)arg;
-    threadPool->handleTask();
 }

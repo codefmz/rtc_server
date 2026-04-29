@@ -4,6 +4,7 @@
 #include <queue>
 #include <stdint.h>
 #include <memory>
+#include <mutex>
 #include "MediaSource.h"
 #include "unordered_map"
 #include "Encoder.h"
@@ -50,12 +51,12 @@ public:
     WinCapMediaSource(std::shared_ptr<ThreadPool> pool);
     virtual ~WinCapMediaSource();
 
-    int init();
-
-    int deInit();
+    void startCapture();
 
 protected:
-    virtual void readFrame();
+    virtual void readFrame() {
+
+    };
 
 private:
     int videoInit();
@@ -65,10 +66,14 @@ private:
     winrt::com_ptr<IMFDXGIDeviceManager> CreateDxgiDeviceManager(ID3D11Device* device);
 
 private:
+    std::mutex mEncoderMutex;
+    winrt::GraphicsCaptureSession mSession;
+    winrt::Direct3D11CaptureFramePool mFramePool;
     HMONITOR mMonitor;
     winrt::GraphicsCaptureItem mItem;
     winrt::com_ptr<ID3D11Device> mD3dDevice;
     winrt::com_ptr<ID3D11DeviceContext> mContext;
+    winrt::com_ptr<IMFTransform> mTransform;
     winrt::Direct3D11::IDirect3DDevice mDevice;
 };
 
