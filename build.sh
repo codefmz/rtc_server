@@ -65,7 +65,7 @@ fi
 
 if [ "$rebuild" == "y" ]; then
     rm -rf build
-    cmake --preset=default $cmake_params
+    cmake -B build --preset=default $cmake_params
 fi
 
 echo "compile target = ${target}, platform = ${platform}"

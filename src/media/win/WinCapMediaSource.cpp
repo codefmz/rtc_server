@@ -58,6 +58,7 @@ WinCapMediaSource::WinCapMediaSource(std::shared_ptr<ThreadPool> pool, int fps) 
         mFrameInputQueue.push(&mFrames[i]);
     }
 
+    videoInit();
 }
 
 WinCapMediaSource::~WinCapMediaSource()
@@ -371,6 +372,7 @@ int WinCapMediaSource::videoInit()
                 encodedHeight, frameIndex++);
         }
     });
+
     return 0;
 }
 

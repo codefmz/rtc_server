@@ -23,10 +23,12 @@ public:
     }
 };
 
-TEST_F(winMedia, testThreadPoolStartEnd)
+TEST_F(winMedia, winCap)
 {
     auto mediaSource = std::make_shared<WinCapMediaSource>(nullptr, 30);
     mediaSource->startCapture();
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 }
 
 int main(int argc, char** argv) {
