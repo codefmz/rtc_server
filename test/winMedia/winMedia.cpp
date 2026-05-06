@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "ThreadPool.h"
+#include "WinCapMediaSource.h"
 #include "plog/Log.h"
 #include <memory>
 
@@ -11,11 +11,11 @@
 #include "plog/Log.h"
 
 
-class threadpool : public ::testing::Test {
+class winMedia : public ::testing::Test {
 public:
-    threadpool() {
+    winMedia() {
     }
-    ~threadpool() override {
+    ~winMedia() override {
     }
     void SetUp() override {
     }
@@ -23,27 +23,10 @@ public:
     }
 };
 
-void testTask(void* arg)
+TEST_F(winMedia, testThreadPoolStartEnd)
 {
-    int *i = (int*)arg;
-    ++(*i);
-    auto tid = std::this_thread::get_id();
-    PLOGD << "this_thread id: " << tid;
-}
-
-TEST_F(threadpool, testThreadPoolStartEnd)
-{
-    std::shared_ptr<ThreadPool> pool = std::make_shared<ThreadPool>(10);
-
-    int num = 0;
-    Task task;
-    task.setTaskCallback(testTask, &num);
-
-    for (int i = 0; i < 1000; i++) {
-        pool->addTask(task);
-    }
-
-    PLOGD << "num: " << num;
+    auto mediaSource = std::make_shared<WinCapMediaSource>(nullptr, 30);
+    mediaSource->startCapture();
 }
 
 int main(int argc, char** argv) {

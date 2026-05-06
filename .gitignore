@@ -3,4 +3,6 @@ build/
 Debug/
 bin/
 .vscode/
+CMakeUserPresets.json
+env_msvc.sh
 

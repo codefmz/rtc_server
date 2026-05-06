@@ -61,8 +61,8 @@ void ThreadPool::cancelThreads()
         }
     }
 
-    for (std::thread& thread : mThreads) {
-        thread.join();
+    for (std::thread& t : mThreads) {
+        t.join();
     }
     mThreads.clear();
 }

@@ -1,10 +1,15 @@
 #include "rtc_utils.h"
 #include "plog/Log.h"
 #include "Base.h"
-#include "PlatformCompat.h"
 #include <array>
+#include <filesystem>
+#include <fstream>
 #include <memory>
-#include <dirent.h>
+
+#ifdef _WIN32
+    #define popen _popen
+    #define pclose _pclose
+#endif
 
 bool Utils::popenCmd(const std::string &cmd, std::string &output)
 {
@@ -94,34 +99,36 @@ int Utils::parseH264(uint8_t *h264Data, int length, int offset,
 
 std::string Utils::getCameraDevName(const std::string &camName)
 {
-    DIR* dir = opendir("/sys/class/video4linux/");
-    if (!dir) {
+    const std::filesystem::path videoClassPath("/sys/class/video4linux");
+    std::error_code ec;
+    if (!std::filesystem::exists(videoClassPath, ec) || !std::filesystem::is_directory(videoClassPath, ec)) {
         return "";
     }
 
-    std::array<std::string, 2> devNames;
-    int count = 0;
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        std::string path = "/sys/class/video4linux/" + std::string(entry->d_name) + "/name";
-        std::ifstream ifs(path);
+    std::string devName;
+    for (const auto &entry : std::filesystem::directory_iterator(videoClassPath, ec)) {
+        if (ec) {
+            break;
+        }
+
+        const auto namePath = entry.path() / "name";
+        std::ifstream ifs(namePath);
         std::string device_name;
         if (ifs && std::getline(ifs, device_name)) {
             if (device_name.find(camName) != std::string::npos) {
-                devNames[count++] = std::string(entry->d_name);
-                if (count == 2) {
-                    break;
+                const std::string currentDevName = entry.path().filename().string();
+                if (devName.empty() || currentDevName < devName) {
+                    devName = currentDevName;
                 }
             }
         }
     }
 
-    closedir(dir);
-    if (devNames[0] > devNames[1]) { //readdir 涓嶆槸鎸夌収椤哄簭璇诲彇鐨? usb浼氬姞杞戒袱涓紝鍙湁搴忓彿杈冨皬鐨勯偅涓彲浠ョ敤
-        devNames[0] = devNames[1];
+    if (devName.empty()) {
+        return "";
     }
 
-    return "/dev/" + devNames[0];
+    return "/dev/" + devName;
 }
 
 void Utils::getVideoDevs(std::vector<std::string> &devs)
