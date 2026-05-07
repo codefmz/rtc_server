@@ -24,6 +24,8 @@ int startCode4(uint8_t* buf);
 
 void dumpToFile(const std::string &filePath, uint8_t *data, int length);
 
+uint64_t getNowMs();
+
 };
 
 #endif

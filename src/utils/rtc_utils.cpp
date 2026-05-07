@@ -172,3 +172,12 @@ void Utils::dumpToFile(const std::string &filePath, uint8_t *data, int length)
     file.write(reinterpret_cast<char*>(data), length);
     file.close();
 }
+
+uint64_t Utils::getNowMs()
+{
+    using namespace std::chrono;
+
+    return duration_cast<milliseconds>(
+        steady_clock::now().time_since_epoch()
+    ).count();
+}

@@ -1,12 +1,10 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
-#include <map>
-#include <stdint.h>
 
+#include <stdint.h>
 #include "Poller.h"
 #include "Event.h"
 
-typedef uint32_t TimerId;
 typedef int64_t Timestamp; //ms
 typedef uint32_t TimeInterval; //ms
 
@@ -14,46 +12,46 @@ class Timer
 {
 public:
     ~Timer();
-
-    static Timestamp getCurTime();
-
-private:
-    friend class TimerManager;
     Timer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval);
     void handleEvent();
+    bool repeat() const { return mRepeat; }
+
+    Timestamp getTimestamp() const { 
+        return mTimestamp; 
+    }
+
+    TimeInterval getTimeInterval() const { 
+        return mTimeInterval; 
+    }
+
+    void setTimerStamp(Timestamp timestamp) { 
+        mTimestamp = timestamp; 
+    }
+
+    uint32_t getTimerId() const {
+        return mTimerId;
+    }
+
+    void setTimerId(uint32_t timerId) {
+        mTimerId = timerId;
+    }
+
+    struct TimerCompare {
+        bool operator()(const Timer* a, const Timer* b) const {
+            return a->getTimestamp() > b->getTimestamp();
+        }
+    };
+
+    void updateTimerStamp() {
+        mTimestamp += mTimeInterval;
+    }
 
 private:
     TimerEvent* mTimerEvent;
     Timestamp mTimestamp;
     TimeInterval mTimeInterval;
+    uint32_t mTimerId;
     bool mRepeat;
-};
-
-class TimerManager
-{
-public:
-    static TimerManager* createNew(Poller* poller);
-
-    TimerManager(int timerFd, Poller* poller);
-    ~TimerManager();
-
-    TimerId addTimer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval);
-    bool removeTimer(TimerId timerId);
-
-private:
-    void modifyTimeout();
-    static void handleRead(void*);
-    void handleTimerEvent();
-
-private:
-    Poller* mPoller;
-    int mTimerFd;
-    uint32_t mLastTimerId;
-    std::map<TimerId, Timer> mTimers;
-
-    typedef std::pair<Timestamp, TimerId> TimerIndex;
-    std::multimap<TimerIndex, Timer> mEvents;
-    IOEvent* mTimerIOEvent;
 };
 
 #endif //_TIMER_H_
