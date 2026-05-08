@@ -12,6 +12,10 @@ Timer::Timer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval) 
 
 Timer::~Timer()
 {
+    if (mTimerEvent) {
+        delete mTimerEvent;
+        mTimerEvent = nullptr;
+    }
 }
 
 void Timer::handleEvent()

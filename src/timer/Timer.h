@@ -2,7 +2,6 @@
 #define _TIMER_H_
 
 #include <stdint.h>
-#include "Poller.h"
 #include "Event.h"
 
 typedef int64_t Timestamp; //ms

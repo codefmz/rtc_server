@@ -1,6 +1,8 @@
-
-add_subdirectory(win)
-# add_subdirectory(v4l2)
+if(WIN32)
+    add_subdirectory(win)
+else()
+    add_subdirectory(v4l2)
+endif()
 
 file(GLOB SRC "./*.cpp")
 

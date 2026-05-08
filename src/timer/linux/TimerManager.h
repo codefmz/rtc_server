@@ -6,13 +6,14 @@
 #include "Timer.h"
 #include <unordered_set>
 #include <queue>
+#include <memory>
 
 typedef uint32_t TimerId;
 
 class TimerManager
 {
 public:
-    TimerManager(Poller* poller);
+    TimerManager(std::shared_ptr<Poller> poller);
     ~TimerManager();
 
     TimerId addTimer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval);
@@ -25,7 +26,7 @@ private:
     bool timerFdSetTime(int fd, Timestamp when, TimeInterval period);
 
 private:
-    Poller* mPoller;
+    std::shared_ptr<Poller> mPoller;
     int mTimerFd;
     uint32_t mLastTimerId;
     std::priority_queue<Timer*, std::vector<Timer*>, Timer::TimerCompare> mTimerQueue;

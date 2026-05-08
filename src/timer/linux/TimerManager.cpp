@@ -2,9 +2,9 @@
 #include "rtc_utils.h"
 #include <sys/timerfd.h>
 
-TimerManager::TimerManager(Poller* poller) : mPoller(poller), mLastTimerId(0)
+TimerManager::TimerManager(std::shared_ptr<Poller> poller) : mPoller(poller), mLastTimerId(0)
 {
-    int timerFd = timerFdCreate(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
+    int timerFd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
     if (timerFd < 0) {
         return;
     }
@@ -19,6 +19,11 @@ TimerManager::TimerManager(Poller* poller) : mPoller(poller), mLastTimerId(0)
 
 TimerManager::~TimerManager()
 {
+    while (!mTimerQueue.empty()) {
+        Timer* timer = mTimerQueue.top();
+        mTimerQueue.pop();
+        delete timer;
+    }
     mPoller->removeIOEvent(mTimerIOEvent);
     delete mTimerIOEvent;
 }
@@ -72,6 +77,7 @@ void TimerManager::modifyTimeout()
         }
 
         timerFdSetTime(mTimerFd, timer->getTimestamp(), timer->getTimeInterval());
+        break;
     }
 
     if (mTimerQueue.empty()) {

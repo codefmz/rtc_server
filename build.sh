@@ -14,7 +14,7 @@ print_usage() {
 }
 
 # 解析命令行参数
-ARGS=$(getopt -o p:t:r --name "$0" -- "$@")
+ARGS=$(getopt -o p:t:d:r --name "$0" -- "$@")
 if [ $? -ne 0 ]; then
     echo "Error in command line arguments."
     print_usage
@@ -53,17 +53,17 @@ while true; do
 done
 
 cmake_params=""
-if [ "$debug" == "y" ]; then
+if [ "$debug" = "y" ]; then
     cmake_params="-DCMAKE_BUILD_TYPE=Debug"
 else
     cmake_params="-DCMAKE_BUILD_TYPE=Release"
 fi
 
-if [ "$target" != "" ]; then
+if [ -n "$target" ]; then
     cmake_params="$cmake_params -DTARGET=$target"
 fi
 
-if [ "$rebuild" == "y" ]; then
+if [ "$rebuild" = "y" ]; then
     rm -rf build
     cmake -B build --preset=default $cmake_params
 fi

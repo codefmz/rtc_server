@@ -1,2 +1,2 @@
 add_subdirectory(threadpool)
-add_subdirectory(winMedia)
+add_subdirectory(timer)
