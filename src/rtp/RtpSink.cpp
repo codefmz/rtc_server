@@ -1,19 +1,21 @@
 #include <arpa/inet.h>
 #include "RtpSink.h"
 #include "plog/Log.h"
+#include "rtc_utils.h"
 
 RtpSink::RtpSink(std::shared_ptr<TimerManager> timeManager, std::shared_ptr<MediaSource> mediaSource, int payloadType) : 
     mMediaSource(mediaSource), mSendPacketCallback(NULL), mTimerManager(timeManager), mCsrcLen(0), mExtension(0), mPadding(0),
-    mVersion(RTP_VESION), mPayloadType(payloadType), mMarker(0), mSeq(0), mTimestamp(0), mTimerId(0)
+    mVersion(RTP_VESION), mPayloadType(payloadType), mMarker(0), mSeq(0), mTimestamp(0), mTimerEvent(this), mTimerId(0)
 {
-    mTimerEvent = TimerEvent(this);
     mTimerEvent.setTimeoutCallback(timeoutCallback);
     mSSRC = rand();
 }
 
 RtpSink::~RtpSink()
 {
-    mTimerManager->removeTimedEvent(mTimerId);
+    if (mTimerManager && mTimerId != 0) {
+        mTimerManager->removeTimer(mTimerId);
+    }
 }
 
 void RtpSink::setSendFrameCallback(SendPacketCallback cb)
@@ -54,10 +56,13 @@ void RtpSink::timeoutCallback(void* arg)
 
 void RtpSink::start(int ms)
 {
-    mTimerId = mTimerManager->addTimer(mTimerEvent, Utils::getCurrentTime(), ms);
+    mTimerId = mTimerManager->addTimer(mTimerEvent, Utils::getNowMs(), ms);
 }
 
 void RtpSink::stop()
 {
-    mTimerManager->removeTimedEvent(mTimerId);
+    if (mTimerManager && mTimerId != 0) {
+        mTimerManager->removeTimer(mTimerId);
+        mTimerId = 0;
+    }
 }

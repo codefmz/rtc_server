@@ -44,7 +44,7 @@ protected:
     uint32_t mSSRC;
 
 private:
-    TimerEvent* mTimerEvent;
+    TimerEvent mTimerEvent;
     TimerId mTimerId;
 };
 
