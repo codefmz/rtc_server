@@ -18,7 +18,7 @@ public:
     TimerManager();
     ~TimerManager();
 
-    TimerId addTimer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval);
+    TimerId addTimer(TimerEvent event, Timestamp timestamp, TimeInterval timeInterval);
     bool removeTimer(TimerId timerId);
 
 private:

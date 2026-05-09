@@ -7,7 +7,7 @@
 class H264RtpSink : public RtpSink
 {
 public:
-    H264RtpSink(std::shared_ptr<EventScheduler> scheduler, std::shared_ptr<MediaSource> mediaSource);
+    H264RtpSink(std::shared_ptr<TimerManager> timerManager, std::shared_ptr<MediaSource> mediaSource);
     virtual ~H264RtpSink();
 
     virtual void handleFrame(Frame* frame);

@@ -48,18 +48,13 @@ TEST_F(wintimer, testTimer)
     std::atomic<int> i(100);
     auto timerManager = std::make_shared<TimerManager>();
 
-    TimerEvent* event = new TimerEvent;
-    event->setTimeoutCallback(testTask);
-    event->setArg(&i);
+    TimerEvent event;
+    event.setTimeoutCallback(testTask);
+    event.setArg(&i);
     auto timerId1 = timerManager->addTimer(event, getNowMs(), 100);
-
-    TimerEvent* event2 = new TimerEvent;
-    event2->setTimeoutCallback(testTask);
-    event2->setArg(&i);
-    auto timerId2 = timerManager->addTimer(event2, getNowMs() + 50, 100);
+    auto timerId2 = timerManager->addTimer(event, getNowMs() + 50, 100);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(360));
-
     timerManager->removeTimer(timerId1);
     timerManager->removeTimer(timerId2);
 
@@ -71,9 +66,9 @@ TEST_F(wintimer, testRemoveTimer)
     std::atomic<int> i(100);
     auto timerManager = std::make_shared<TimerManager>();
 
-    TimerEvent* event = new TimerEvent;
-    event->setTimeoutCallback(testTask);
-    event->setArg(&i);
+    TimerEvent event;
+    event.setTimeoutCallback(testTask);
+    event.setArg(&i);
     auto timerId = timerManager->addTimer(event, getNowMs() + 100, 0);
     timerManager->removeTimer(timerId);
 

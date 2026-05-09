@@ -11,7 +11,7 @@ class Timer
 {
 public:
     ~Timer();
-    Timer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval);
+    Timer(TimerEvent event, Timestamp timestamp, TimeInterval timeInterval);
     void handleEvent();
     bool repeat() const { return mRepeat; }
 
@@ -46,7 +46,7 @@ public:
     }
 
 private:
-    TimerEvent* mTimerEvent;
+    TimerEvent mTimerEvent;
     Timestamp mTimestamp;
     TimeInterval mTimeInterval;
     uint32_t mTimerId;

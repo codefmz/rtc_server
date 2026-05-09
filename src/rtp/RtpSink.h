@@ -6,15 +6,14 @@
 #include "MediaSource.h"
 #include "Event.h"
 #include "Rtp.h"
-#include "Timer.h"
-#include "Scheduler.h"
+#include "TimerManager.h"
 
 class RtpSink
 {
 public:
     typedef void (*SendPacketCallback)(RtpPacket* mediaPacket);
 
-    RtpSink(std::shared_ptr<EventScheduler> scheduler, std::shared_ptr<MediaSource> mediaSource, int payloadType);
+    RtpSink(std::shared_ptr<TimerManager> timeManager, std::shared_ptr<MediaSource> mediaSource, int payloadType);
     virtual ~RtpSink();
 
     void setSendFrameCallback(SendPacketCallback cb);
@@ -30,7 +29,7 @@ private:
     static void timeoutCallback(void*);
 
 protected:
-    std::shared_ptr<EventScheduler> mScheduler;
+    std::shared_ptr<TimerManager> mTimerManager;
     std::shared_ptr<MediaSource> mMediaSource;
     SendPacketCallback mSendPacketCallback;
 

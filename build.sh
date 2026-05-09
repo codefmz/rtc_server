@@ -53,17 +53,17 @@ while true; do
 done
 
 cmake_params=""
-if [ "$debug" = "y" ]; then
+if [ "$debug" == "y" ]; then
     cmake_params="-DCMAKE_BUILD_TYPE=Debug"
 else
     cmake_params="-DCMAKE_BUILD_TYPE=Release"
 fi
 
-if [ -n "$target" ]; then
+if [ "$target" != "" ]; then
     cmake_params="$cmake_params -DTARGET=$target"
 fi
 
-if [ "$rebuild" = "y" ]; then
+if [ "$rebuild" == "y" ]; then
     rm -rf build
     cmake -B build --preset=default $cmake_params
 fi

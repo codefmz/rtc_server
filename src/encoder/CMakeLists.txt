@@ -1,5 +1,5 @@
 if(WIN32)
-    add_subdirectory(win)
+    # add_subdirectory(win)
 else()
     add_subdirectory(linux)
 endif()

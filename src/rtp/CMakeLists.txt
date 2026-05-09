@@ -1,3 +1,5 @@
+add_subdirectory(h264)
+
 file(GLOB SRC "./*.cpp")
 
 add_library(rtp STATIC ${SRC})

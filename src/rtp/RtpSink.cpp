@@ -2,19 +2,18 @@
 #include "RtpSink.h"
 #include "plog/Log.h"
 
-RtpSink::RtpSink(std::shared_ptr<EventScheduler> scheduler, std::shared_ptr<MediaSource> mediaSource, int payloadType) : 
-    mMediaSource(mediaSource), mSendPacketCallback(NULL), mScheduler(scheduler), mCsrcLen(0), mExtension(0), mPadding(0),
+RtpSink::RtpSink(std::shared_ptr<TimerManager> timeManager, std::shared_ptr<MediaSource> mediaSource, int payloadType) : 
+    mMediaSource(mediaSource), mSendPacketCallback(NULL), mTimerManager(timeManager), mCsrcLen(0), mExtension(0), mPadding(0),
     mVersion(RTP_VESION), mPayloadType(payloadType), mMarker(0), mSeq(0), mTimestamp(0), mTimerId(0)
 {
-    mTimerEvent = new TimerEvent(this);
-    mTimerEvent->setTimeoutCallback(timeoutCallback);
+    mTimerEvent = TimerEvent(this);
+    mTimerEvent.setTimeoutCallback(timeoutCallback);
     mSSRC = rand();
 }
 
 RtpSink::~RtpSink()
 {
-    mScheduler->removeTimedEvent(mTimerId);
-    delete mTimerEvent;
+    mTimerManager->removeTimedEvent(mTimerId);
 }
 
 void RtpSink::setSendFrameCallback(SendPacketCallback cb)
@@ -45,7 +44,7 @@ void RtpSink::timeoutCallback(void* arg)
 {
     RtpSink* rtpSink = (RtpSink*)arg;
     Frame* frame = rtpSink->mMediaSource->getFrame();
-    if(!frame) {
+    if (!frame) {
         return;
     }
 
@@ -55,10 +54,10 @@ void RtpSink::timeoutCallback(void* arg)
 
 void RtpSink::start(int ms)
 {
-    mTimerId = mScheduler->addTimedEventRunEvery(mTimerEvent, ms);
+    mTimerId = mTimerManager->addTimer(mTimerEvent, Utils::getCurrentTime(), ms);
 }
 
 void RtpSink::stop()
 {
-    mScheduler->removeTimedEvent(mTimerId);
+    mTimerManager->removeTimedEvent(mTimerId);
 }

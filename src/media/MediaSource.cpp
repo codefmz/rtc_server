@@ -12,7 +12,7 @@ MediaSource::~MediaSource()
 Frame* MediaSource::getFrame()
 {
     std::lock_guard<std::mutex> lock(mMutex);
-    if(mFrameOutputQueue.empty()) {
+    if (mFrameOutputQueue.empty()) {
         return nullptr;
     }
 
@@ -27,7 +27,9 @@ void MediaSource::putFrame(Frame* frame)
     std::lock_guard<std::mutex> lock(mMutex);
     frame->mSizeArr.clear();
     mFrameInputQueue.push(frame);
-    mPool->addTask(mTask);
+    if (mPool) {
+        mPool->addTask(mTask);
+    }
 }
 
 void MediaSource::taskCallback(void* arg)

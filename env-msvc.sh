@@ -10,7 +10,12 @@ MSVC_VER="14.43.34808"
 
 WIN_KITS_ROOT="C:/Program Files (x86)/Windows Kits/10"
 
-export PATH="/d/instal_package/cmake/bin:/d/instal_package/visual studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja:/d/instal_package/visual studio/VC/Tools/MSVC/${MSVC_VER}/bin/Hostx64/x64:/c/Program Files (x86)/Windows Kits/10/bin/${SDK_VER}/x64:/c/Program Files (x86)/Windows Kits/10/bin/x64:$PATH"
+STRAWBERRY_ROOT="/c/Strawberry"
+STRAWBERRY_PERL_BIN="${STRAWBERRY_ROOT}/perl/bin"
+
+export PERL="${STRAWBERRY_PERL_BIN}/perl.exe"
+
+export PATH="${STRAWBERRY_PERL_BIN}:/d/instal_package/cmake/bin:/d/instal_package/visual studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja:/d/instal_package/visual studio/VC/Tools/MSVC/${MSVC_VER}/bin/Hostx64/x64:/c/Program Files (x86)/Windows Kits/10/bin/${SDK_VER}/x64:/c/Program Files (x86)/Windows Kits/10/bin/x64:$PATH"
 
 export RC="${WIN_KITS_ROOT}/bin/${SDK_VER}/x64/rc.exe"
 
@@ -24,7 +29,7 @@ export LIB="${WIN_KITS_ROOT}/Lib/${SDK_VER}/ucrt/x64;${WIN_KITS_ROOT}/Lib/${SDK_
 
 export LIBPATH="${WIN_KITS_ROOT}/UnionMetadata/${SDK_VER};${WIN_KITS_ROOT}/References/${SDK_VER};${VS_ROOT}/VC/Tools/MSVC/${MSVC_VER}/lib/x64"
 
-export VCPKG_KEEP_ENV_VARS="PATH;LIB;LIBPATH;INCLUDE;RC;CMAKE_MT"
+export VCPKG_KEEP_ENV_VARS="PATH;LIB;LIBPATH;INCLUDE;RC;CMAKE_MT;PERL"
 
 echo "where cl:"
 
@@ -41,3 +46,7 @@ cmd //c where mt
 echo "where link:"
 
 cmd //c where link
+
+echo "where perl:"
+
+cmd //c where perl

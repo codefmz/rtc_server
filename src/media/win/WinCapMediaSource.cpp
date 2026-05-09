@@ -243,10 +243,24 @@ void WinCapMediaSource::WriteSampleBytesToFile(IMFSample* sample)
     /* 锁定缓冲区，获取指向编码后 H.264 数据的指针和数据长度 */
     CheckHr(buffer->Lock(&data, &maxLength, &currentLength), "IMFMediaBuffer::Lock(output)");
 
-    if (currentLength > 0) {
-        Utils::dumpToFile("test.264", data, currentLength);
+    if (currentLength <= 0) {
+        CheckHr(buffer->Unlock(), "IMFMediaBuffer::Unlock(output)");
+        return;
     }
 
+    Utils::dumpToFile("test.264", data, currentLength);
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mFrameInputQueue.empty()) {
+        PLOGE << "V4l2MediaSource::readFrame mAVFrameInputQueue.empty()";
+        CheckHr(buffer->Unlock(), "IMFMediaBuffer::Unlock(output)");
+        return;
+    }
+
+    Frame* frame = mFrameInputQueue.front();
+    parseH264(frame, data, currentLength);
+    mFrameInputQueue.pop();
+    mFrameOutputQueue.push(frame);
     CheckHr(buffer->Unlock(), "IMFMediaBuffer::Unlock(output)");
 }
 

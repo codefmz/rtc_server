@@ -4,8 +4,8 @@
 #include "H264RtpSink.h"
 #include "plog/Log.h"
 
-H264RtpSink::H264RtpSink(std::shared_ptr<EventScheduler> scheduler, std::shared_ptr<MediaSource> mediaSource) :
-    RtpSink(scheduler, mediaSource, RTP_PAYLOAD_TYPE_H264), mClockRate(90000), mFps(mediaSource->getFps())
+H264RtpSink::H264RtpSink(std::shared_ptr<TimerManager> timerManager, std::shared_ptr<MediaSource> mediaSource) :
+    RtpSink(timerManager, mediaSource, RTP_PAYLOAD_TYPE_H264), mClockRate(90000), mFps(mediaSource->getFps())
 {
     start();
 }

@@ -16,7 +16,7 @@ public:
     TimerManager(std::shared_ptr<Poller> poller);
     ~TimerManager();
 
-    TimerId addTimer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval);
+    TimerId addTimer(TimerEvent event, Timestamp timestamp, TimeInterval timeInterval);
     bool removeTimer(TimerId timerId);
 
 private:

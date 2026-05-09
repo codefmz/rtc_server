@@ -28,7 +28,7 @@ TimerManager::~TimerManager()
     delete mTimerIOEvent;
 }
 
-TimerId TimerManager::addTimer(TimerEvent* event, Timestamp timestamp, TimeInterval timeInterval)
+TimerId TimerManager::addTimer(TimerEvent event, Timestamp timestamp, TimeInterval timeInterval)
 {
     Timer *timer = new Timer(event, timestamp, timeInterval);
 
