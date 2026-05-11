@@ -101,6 +101,9 @@ private:
     winrt::com_ptr<ID3D11DeviceContext> mContext{nullptr};
     winrt::com_ptr<IMFTransform> mTransform{nullptr};
     winrt::Direct3D11::IDirect3DDevice mDevice{nullptr};
+
+    uint32_t mFrameIndex = 0;
+    uint64_t mStartTime = 0;
 };
 
 #endif //_V4L2_MEDIA_SOURCE_H_

@@ -34,9 +34,8 @@ TEST_F(winMedia, winCap)
 int main(int argc, char** argv) {
 
     static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-    static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("./test.txt", 8000, 3);
+    static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("./test.txt", 80000, 3);
     plog::init(plog::debug, &consoleAppender).addAppender(&fileAppender);
-
 
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

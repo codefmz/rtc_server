@@ -1,7 +1,7 @@
-#include <arpa/inet.h>
 #include "RtpSink.h"
 #include "plog/Log.h"
 #include "rtc_utils.h"
+#include "inet.h"
 
 RtpSink::RtpSink(std::shared_ptr<TimerManager> timeManager, std::shared_ptr<MediaSource> mediaSource, int payloadType) : 
     mMediaSource(mediaSource), mSendPacketCallback(NULL), mTimerManager(timeManager), mCsrcLen(0), mExtension(0), mPadding(0),
@@ -18,7 +18,7 @@ RtpSink::~RtpSink()
     }
 }
 
-void RtpSink::setSendFrameCallback(SendPacketCallback cb)
+void RtpSink::setSendFrameCallback(std::function<void(RtpPacket*)> cb)
 {
     mSendPacketCallback = cb;
 }

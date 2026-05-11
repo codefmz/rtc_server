@@ -68,6 +68,7 @@ WinCapMediaSource::~WinCapMediaSource()
 
 void WinCapMediaSource::startCapture()
 {
+    mStartTime = Utils::getNowMs();
     mSession.StartCapture();
 }
 
@@ -248,7 +249,10 @@ void WinCapMediaSource::WriteSampleBytesToFile(IMFSample* sample)
         return;
     }
 
-    Utils::dumpToFile("test.264", data, currentLength);
+    static int cnt = 0;
+    std::string filePath = "./h264data/test_" + std::to_string(cnt++) + ".264";
+    Utils::dumpToFile(filePath, data, currentLength);
+    Utils::dumpToFile("./h264data/test_all.264", data, currentLength);
 
     std::lock_guard<std::mutex> lock(mMutex);
     if (mFrameInputQueue.empty()) {
@@ -369,9 +373,14 @@ int WinCapMediaSource::videoInit()
     // DXGI surface to the H.264 encoder when supported.
     mFramePool.FrameArrived([this, gpuConverter, isSupportDxgiInput, encodedWidth, encodedHeight, frameIndex = UINT64{ 0 }](auto& sender, auto&) mutable {
         // TryGetNextFrame 取出帧池中的下一帧；frame 持有捕获表面和时间戳等信息。
-        auto frame = sender.TryGetNextFrame();
-        auto surface = frame.Surface();
+        auto frame = sender.TryGetNextFrame(); // 需要先将帧从帧池取出来， 否则会阻塞
+        auto now = Utils::getNowMs();
+        if (now < mStartTime + mFrameIndex * 1000 / mFps) {
+            return; // 丢帧, 默认是按照屏幕刷新率来接收帧的，实际需要按照mFps 刷新率来
+        }
+        mFrameIndex++;
 
+        auto surface = frame.Surface();
         // WinRT surface 本质上包着 DXGI/D3D 资源，这里取回底层 ID3D11Texture2D，
         // 方便使用 D3D11 API 复制、读取或交给编码器。
         auto tex = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surface);

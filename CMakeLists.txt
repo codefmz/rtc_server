@@ -7,6 +7,8 @@ message("PLATFORM_NAME: ${PLATFORM_NAME}")
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin/${PLATFORM_NAME})
 
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
 find_package(GTest CONFIG REQUIRED)
 find_package(plog CONFIG REQUIRED)
 

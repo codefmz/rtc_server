@@ -7,7 +7,7 @@ if(NOT WIN32)
     add_subdirectory(v4l2)
 endif()
 
-# add_subdirectory(rtp)
+add_subdirectory(rtp)
 # add_subdirectory(scheduler)
 add_subdirectory(threadpool)
 add_subdirectory(media)
