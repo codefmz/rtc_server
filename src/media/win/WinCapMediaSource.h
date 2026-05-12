@@ -52,6 +52,7 @@ public:
     virtual ~WinCapMediaSource();
 
     void startCapture();
+    void stopCapture();
 
 protected:
     virtual void readFrame() {

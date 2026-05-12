@@ -72,6 +72,11 @@ void WinCapMediaSource::startCapture()
     mSession.StartCapture();
 }
 
+void WinCapMediaSource::stopCapture()
+{
+    videoExit();
+}
+
 winrt::com_ptr<IMFDXGIDeviceManager> WinCapMediaSource::CreateDxgiDeviceManager(ID3D11Device* device)
 {
     UINT resetToken = 0;

@@ -4,7 +4,7 @@
 #include "inet.h"
 
 RtpSink::RtpSink(std::shared_ptr<TimerManager> timeManager, std::shared_ptr<MediaSource> mediaSource, int payloadType) : 
-    mMediaSource(mediaSource), mSendPacketCallback(NULL), mTimerManager(timeManager), mCsrcLen(0), mExtension(0), mPadding(0),
+    mMediaSource(mediaSource), mSendPacketCallback(nullptr), mTimerManager(timeManager), mCsrcLen(0), mExtension(0), mPadding(0),
     mVersion(RTP_VESION), mPayloadType(payloadType), mMarker(0), mSeq(0), mTimestamp(0), mTimerEvent(this), mTimerId(0)
 {
     mTimerEvent.setTimeoutCallback(timeoutCallback);
@@ -18,7 +18,7 @@ RtpSink::~RtpSink()
     }
 }
 
-void RtpSink::setSendFrameCallback(std::function<void(RtpPacket*)> cb)
+void RtpSink::setSendFrameCallback(SendPacketCallback cb)
 {
     mSendPacketCallback = cb;
 }

@@ -9,13 +9,15 @@
 #include "TimerManager.h"
 #include <functional>
 
+typedef void(*SendPacketCallback)(RtpPacket*);
+
 class RtpSink
 {
 public:
     RtpSink(std::shared_ptr<TimerManager> timeManager, std::shared_ptr<MediaSource> mediaSource, int payloadType);
     virtual ~RtpSink();
 
-    void setSendFrameCallback(std::function<void(RtpPacket*)> cb);
+    void setSendFrameCallback(SendPacketCallback cb);
 
     void stop();
 
@@ -30,7 +32,7 @@ private:
 protected:
     std::shared_ptr<TimerManager> mTimerManager;
     std::shared_ptr<MediaSource> mMediaSource;
-    std::function<void(RtpPacket*)> mSendPacketCallback;
+    SendPacketCallback mSendPacketCallback;
 
     uint8_t mCsrcLen;
     uint8_t mExtension;

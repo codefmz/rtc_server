@@ -1,3 +1,5 @@
+add_subdirectory(select)
+
 file(GLOB SRC "./*.cpp")
 
 add_library(poller STATIC ${SRC})

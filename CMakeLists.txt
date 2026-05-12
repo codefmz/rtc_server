@@ -11,6 +11,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 find_package(GTest CONFIG REQUIRED)
 find_package(plog CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 add_subdirectory(src)
 add_subdirectory(test)

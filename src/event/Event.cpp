@@ -9,15 +9,6 @@ void TimerEvent::handleEvent()
     }
 }
 
-IOEvent* IOEvent::createNew(int fd, void* arg)
-{
-    if(fd < 0) {
-        return nullptr;
-    }
-
-    return new IOEvent(fd, arg);
-}
-
 IOEvent::IOEvent(int fd, void* arg) : mFd(fd), mArg(arg),
     mEvent(EVENT_NONE), mREvent(EVENT_NONE), mReadCallback(nullptr),
     mWriteCallback(nullptr), mErrorCallback(nullptr)

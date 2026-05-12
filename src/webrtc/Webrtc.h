@@ -72,6 +72,7 @@ private:
     void processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataChannel> wdc);
 
     int clientDisconnected(void *input, void *output);
+
 private:
     std::shared_ptr<rtc::WebSocketServer> server;
     std::shared_ptr<rtc::WebSocket> client;

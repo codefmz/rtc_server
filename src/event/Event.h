@@ -34,8 +34,6 @@ public:
         EVENT_ERROR = 4,
     };
 
-    static IOEvent* createNew(int fd, void* arg = nullptr);
-
     IOEvent(int fd, void* arg);
     ~IOEvent() { }
 

@@ -6,4 +6,5 @@ bin/
 .vscode/
 CMakeUserPresets.json
 env-msvc.sh
-
+data/
+log/
