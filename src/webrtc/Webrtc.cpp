@@ -50,9 +50,6 @@ Webrtc::Webrtc()
 
 Webrtc::~Webrtc()
 {
-    if (sock != -1) {
-        close(sock);
-    }
     delete outputBuf;
 }
 
@@ -136,22 +133,6 @@ void Webrtc::createPeerConnection(std::weak_ptr<rtc::WebSocket> wclient, rtc::me
     } else {
         PLOGI << "WebSocketServer: Received bytes message";
     }
-}
-
-void Webrtc::createRecvSocket()
-{
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addr.sin_port = htons(6000);
-
-    if (bind(sock, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) < 0) {
-        throw std::runtime_error("Failed to bind UDP socket on 127.0.0.1:6000");
-    }
-
-    int rcvBufSize = 212992;
-    setsockopt(sock, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char *>(&rcvBufSize), sizeof(rcvBufSize));
 }
 
 void Webrtc::processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataChannel> wdc)

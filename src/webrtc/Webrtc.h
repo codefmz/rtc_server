@@ -29,7 +29,7 @@ public:
     void stop();
 
     void addCmdProcessor(RTC_CMD cmd, std::function<int(void *, void *)> processor) {
-        cmdProcessor.insert({cmd, processor});
+        cmdProcessor.try_emplace(cmd, processor);
     }
 
     void sendVideoPacket(RtpPacket *packet) {
@@ -67,8 +67,6 @@ private:
 
     void peerConnectionSetup(std::shared_ptr<rtc::PeerConnection> pc, std::weak_ptr<rtc::WebSocket> wws, const std::string & id);
 
-    void createRecvSocket();
-
     void processPacket(rtc::message_variant &data, std::weak_ptr<rtc::DataChannel> wdc);
 
     int clientDisconnected(void *input, void *output);
@@ -78,7 +76,6 @@ private:
     std::shared_ptr<rtc::WebSocket> client;
     std::shared_ptr<rtc::DataChannel> mDc;
     std::shared_ptr<rtc::PeerConnection> pc;
-    SOCKET sock = -1;
     std::shared_ptr<rtc::Track> track;
     const std::string LOCAL_ID = "server";
     const rtc::SSRC ssrc = 42;
